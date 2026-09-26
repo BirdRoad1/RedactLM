@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import type { ZodError } from "zod";
 import {
   thresholdsSchema,
   updateDefaultsSchema,
@@ -14,7 +15,7 @@ export async function getLlmDetector(c: Context) {
 export async function updateLlmDetector(c: Context) {
   const parsed = await updateLlmDetectorSchema.safeParseAsync(await c.req.json());
   if (parsed.error) {
-    return c.json({ error: "Invalid request", issues: parsed.error.issues }, 400);
+    return invalid(c, parsed.error);
   }
 
   try {
@@ -34,7 +35,7 @@ export async function getDetectionPolicy(c: Context) {
 export async function updateDetectionDefaults(c: Context) {
   const parsed = await updateDefaultsSchema.safeParseAsync(await c.req.json());
   if (parsed.error) {
-    return c.json({ error: "Invalid request", issues: parsed.error.issues }, 400);
+    return invalid(c, parsed.error);
   }
   return policyResponse(c, () => detectionPolicyService.updateDefaults(parsed.data));
 }
@@ -42,7 +43,7 @@ export async function updateDetectionDefaults(c: Context) {
 export async function setCheckerPolicy(c: Context) {
   const parsed = await thresholdsSchema.safeParseAsync(await c.req.json());
   if (parsed.error) {
-    return c.json({ error: "Invalid request", issues: parsed.error.issues }, 400);
+    return invalid(c, parsed.error);
   }
   return policyResponse(c, () =>
     detectionPolicyService.setCheckerOverride(c.req.param("checker")!, parsed.data),
@@ -64,4 +65,12 @@ async function policyResponse(c: Context, run: () => Promise<unknown>) {
     }
     throw err;
   }
+}
+
+// Says what's wrong ("warnAt must not be above blockAt"), not just "Invalid request"
+function invalid(c: Context, error: ZodError) {
+  const message = error.issues
+    .map((issue) => (issue.path.length ? `${issue.path.join(".")}: ${issue.message}` : issue.message))
+    .join("; ");
+  return c.json({ error: message, issues: error.issues }, 400);
 }

@@ -110,6 +110,14 @@ export const openApiDoc = {
         },
       },
     },
+    "/me": {
+      get: {
+        tags: ["Auth"],
+        summary: "The logged-in user",
+        security: bearer,
+        responses: { ...unauthorized, 200: { description: "User", content: json(user) } },
+      },
+    },
     "/v1/chat/completions": {
       post: {
         tags: ["OpenAI-compatible"],

@@ -59,6 +59,11 @@ export async function verifyCredentials(email: string, password: string) {
   return user?.passwordHash && matches ? user.id : undefined;
 }
 
+export async function getUser(userId: number) {
+  const [user] = await db.select(publicColumns).from(usersTable).where(eq(usersTable.id, userId));
+  return user;
+}
+
 // False for users that don't exist (e.g. deleted after their token was issued)
 export async function isAdmin(userId: number) {
   const [user] = await db

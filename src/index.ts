@@ -4,6 +4,7 @@ import { openApiDoc } from "./docs/openapi";
 import { env } from "./env/env";
 import { logRequests } from "./middleware/logger";
 import { authRoutes } from "./routes/auth.routes";
+import { meRoutes } from "./routes/me.routes";
 import { v1Routes } from "./routes/v1.routes";
 import { usersRoutes } from "./routes/users.routes";
 import { backendsRoutes } from "./routes/backends.routes";
@@ -16,6 +17,7 @@ app.use(logRequests);
 app.get("/", (c) => c.text("OK"));
 
 app.route("/auth", authRoutes);
+app.route("/me", meRoutes);
 app.route("/v1", v1Routes);
 app.route("/users", usersRoutes);
 app.route("/backends", backendsRoutes);
