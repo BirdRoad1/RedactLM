@@ -4,9 +4,15 @@ import {
   createBackendSchema,
 } from "../schema/backends.schema";
 import * as backendsService from "../services/backends.service";
+import type { Backend } from "../services/backends.service";
+
+// API keys are write-only: responses show just enough to tell keys apart
+function publicBackend(backend: Backend) {
+  return { ...backend, apiKey: backend.apiKey && `****${backend.apiKey.slice(-4)}` };
+}
 
 export async function listBackends(c: Context) {
-  return c.json(await backendsService.listBackends());
+  return c.json((await backendsService.listBackends()).map(publicBackend));
 }
 
 export async function createBackend(c: Context) {
@@ -16,7 +22,7 @@ export async function createBackend(c: Context) {
   }
 
   try {
-    return c.json(await backendsService.createBackend(parsed.data), 201);
+    return c.json(publicBackend(await backendsService.createBackend(parsed.data)), 201);
   } catch (err) {
     if (err instanceof backendsService.BackendSlugTakenError) {
       return c.json({ error: err.message }, 409);
@@ -36,5 +42,5 @@ export async function deleteBackend(c: Context) {
     return c.json({ error: "Backend not found" }, 404);
   }
 
-  return c.json(deleted);
+  return c.json(publicBackend(deleted));
 }
