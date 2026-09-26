@@ -32,3 +32,4 @@ Jose & Tyler
 - Maybe use new Jev (OpenJev) model for hype
 - Start with small scope, expand as needed, do not allow creep
 - Custom keywords, so we prevent internal names and trade secrets from being shared
+- Start without streaming, add streaming later
