@@ -19,6 +19,7 @@ const empty: NewBackend = {
 export function BackendsPage() {
   const [backends, setBackends] = useState<Backend[]>([])
   const [form, setForm] = useState(empty)
+  const [headers, setHeaders] = useState('') // "Name: value" per line
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
@@ -32,8 +33,19 @@ export function BackendsPage() {
     e.preventDefault()
     setError(null)
     try {
-      await api('/backends', 'POST', { ...form, apiKey: form.apiKey || null })
+      const extraHeaders = Object.fromEntries(
+        headers.split('\n').filter((line) => line.includes(':')).map((line) => {
+          const at = line.indexOf(':')
+          return [line.slice(0, at).trim(), line.slice(at + 1).trim()]
+        }),
+      )
+      await api('/backends', 'POST', {
+        ...form,
+        apiKey: form.apiKey || null,
+        extraHeaders: Object.keys(extraHeaders).length ? extraHeaders : null,
+      })
       setForm(empty)
+      setHeaders('')
       load()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -99,6 +111,10 @@ export function BackendsPage() {
         <label>
           Strip params
           <input value={form.stripParams.join(', ')} onChange={(e) => set('stripParams', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))} placeholder="seed, response_format" />
+        </label>
+        <label className="wide">
+          Extra headers (one per line)
+          <textarea rows={2} value={headers} onChange={(e) => setHeaders(e.target.value)} placeholder="anthropic-version: 2023-06-01" />
         </label>
         <div className="checks">
           <label><input type="checkbox" checked={form.isDefault} onChange={(e) => set('isDefault', e.target.checked)} /> Default</label>
