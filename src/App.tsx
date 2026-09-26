@@ -27,6 +27,7 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireUser><Layout /></RequireUser>}>
         <Route index element={<ChatPage />} />
+        <Route path="c/:id" element={<ChatPage />} />
         <Route path="admin/backends" element={<RequireAdmin><BackendsPage /></RequireAdmin>} />
         <Route path="admin/users" element={<RequireAdmin><UsersPage /></RequireAdmin>} />
         <Route path="admin/policy" element={<RequireAdmin><PolicyPage /></RequireAdmin>} />

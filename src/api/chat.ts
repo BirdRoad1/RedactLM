@@ -12,6 +12,8 @@ export class BlockedError extends Error {
 }
 
 type ChatOptions = {
+  conversationId?: string // continue this conversation; omit to start a new one
+  onConversationId?: (id: string) => void // as soon as the server says which conversation it is
   model: string
   messages: ChatMessage[]
   signal?: AbortSignal
@@ -20,12 +22,13 @@ type ChatOptions = {
 
 // Streams a chat completion. Resolves with any warnings the proxy attached;
 // throws BlockedError when blocked, ApiError for other failures.
-export async function streamChat({ model, messages, signal, onDelta }: ChatOptions) {
+export async function streamChat({ conversationId, onConversationId, model, messages, signal, onDelta }: ChatOptions) {
   let res: Response
   try {
     res = await apiFetch('/v1/chat/completions', {
       method: 'POST',
       body: JSON.stringify({ model, messages, stream: true }),
+      headers: conversationId ? { 'X-Conversation-Id': conversationId } : undefined,
       signal,
     })
   } catch (err) {
@@ -37,6 +40,8 @@ export async function streamChat({ model, messages, signal, onDelta }: ChatOptio
   }
 
   const warnings = JSON.parse(res.headers.get('X-PII-Warnings') ?? '[]') as FlaggedDetection[]
+  const savedAs = res.headers.get('X-Conversation-Id') ?? conversationId
+  if (savedAs) onConversationId?.(savedAs)
 
   // Server-Sent Events: "data: {chunk}" lines, ending with "data: [DONE]"
   const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader()
@@ -60,5 +65,5 @@ export async function streamChat({ model, messages, signal, onDelta }: ChatOptio
     }
   }
 
-  return { warnings }
+  return { warnings, conversationId: savedAs }
 }

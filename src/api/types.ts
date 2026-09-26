@@ -70,3 +70,14 @@ export type LlmDetector = {
   timeoutMs: number
   instructions: string | null
 }
+
+export type ConversationSummary = { id: string; title: string; updatedAt: string }
+
+// Stored messages have sensitive parts masked as "[REDACTED: Phone number]"
+export type Conversation = {
+  id: string
+  title: string | null
+  updatedAt: string
+  model: string | null
+  messages: { role: ChatRole | 'developer' | 'tool'; content: string; action: string }[]
+}
