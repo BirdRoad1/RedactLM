@@ -3,6 +3,7 @@ import { runStaticChecks } from './checkers/run-static-checks';
 import { completionsRequest } from './schema/completions-request.schema';
 import { authRoutes } from './routes/auth.routes';
 import { usersRoutes } from './routes/users.routes';
+import { backendsRoutes } from './routes/backends.routes';
 
 const app = new Hono();
 
@@ -40,6 +41,7 @@ app.post('/v1/chat/completions', async (c) => {
 
 app.route('/auth', authRoutes);
 app.route('/users', usersRoutes);
+app.route('/backends', backendsRoutes);
 
 app.get('/', (c) => {
     return c.text('OK');
