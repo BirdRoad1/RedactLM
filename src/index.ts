@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { runStaticChecks } from './checkers/run-static-checks';
 import { completionsRequest } from './schema/completions-request.schema';
+import { authRoutes } from './routes/auth.routes';
+import { usersRoutes } from './routes/users.routes';
 
 const app = new Hono();
 
@@ -35,6 +37,9 @@ app.post('/v1/chat/completions', async (c) => {
 
     return c.text("Hi");
 })
+
+app.route('/auth', authRoutes);
+app.route('/users', usersRoutes);
 
 app.get('/', (c) => {
     return c.text('OK');

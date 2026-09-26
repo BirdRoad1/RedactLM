@@ -2,7 +2,8 @@
   "name": "llm-thingy",
   "module": "index.ts",
   "scripts": {
-    "dev": "bun run --hot src/index.ts"
+    "dev": "bun run --hot src/index.ts",
+    "create-admin": "bun run scripts/create-admin.ts"
   },
   "type": "module",
   "private": true,
