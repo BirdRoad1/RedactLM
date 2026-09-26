@@ -113,8 +113,9 @@ export function parseFindings(reply: string): LlmFindings | undefined {
 
 // Turns findings into detections at their positions in `text`. Findings the
 // model didn't copy verbatim from the text are dropped: they're most likely
-// hallucinated, and there's no span to point the user at.
-export function locateFindings(text: string, findings: LlmFindings, minConfidence: number) {
+// hallucinated, and there's no span to point the user at. Warn/block
+// thresholds are the detection policy's job, not this function's.
+export function locateFindings(text: string, findings: LlmFindings) {
   const detections: Detection[] = [];
   const haystack = text.toLowerCase();
   let dropped = 0;
@@ -122,7 +123,7 @@ export function locateFindings(text: string, findings: LlmFindings, minConfidenc
   for (const finding of findings.findings) {
     const confidence = Math.min(Math.max(finding.confidence, 0), 1);
     const needle = finding.text.trim();
-    if (confidence < minConfidence || needle.length < 2) continue;
+    if (needle.length < 2) continue;
 
     const category = finding.category in categories
       ? (finding.category as keyof typeof categories)
@@ -216,7 +217,7 @@ export async function runLlmChecks(text: string, signal?: AbortSignal): Promise<
   const findings = parseFindings(reply);
   if (!findings) return unavailable("model reply wasn't valid findings JSON");
 
-  const detections = locateFindings(text, findings, config.minConfidence);
+  const detections = locateFindings(text, findings);
   remember(key, detections);
   return detections;
 }

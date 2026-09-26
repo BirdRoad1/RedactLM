@@ -8,6 +8,7 @@ import {
 } from "../schema/completion-response.schema";
 import { completionsRequest } from "../schema/completions-request.schema";
 import { modelsList } from "../schema/models-request.schema";
+import { thresholdsSchema, updateDefaultsSchema } from "../schema/detection-policy.schema";
 import { updateLlmDetectorSchema } from "../schema/llm-detector.schema";
 import { createUserSchema } from "../schema/user.schema";
 
@@ -29,7 +30,7 @@ const backend = z.object({
   name: z.string(),
   slug: z.string(),
   baseUrl: z.string(),
-  apiKey: z.string().nullable(),
+  apiKey: z.string().nullable().describe("Masked: only the last 4 characters are shown"),
   trust: z.enum(["local", "cloud"]),
   enabled: z.boolean(),
   isDefault: z.boolean(),
@@ -55,10 +56,27 @@ const llmDetector = z.object({
   backendId: z.number().int().nullable(),
   model: z.string().nullable(),
   failMode: z.enum(["block", "allow"]),
-  minConfidence: z.number(),
   timeoutMs: z.number().int(),
   instructions: z.string().nullable(),
   updatedAt: z.string(),
+});
+
+const threshold = z.number().nullable();
+const detectionPolicy = z.object({
+  warnAt: threshold,
+  blockAt: threshold,
+  checkers: z.array(
+    z.object({ checker: z.string(), warnAt: threshold, blockAt: threshold, overridden: z.boolean() }),
+  ),
+});
+
+const flaggedDetection = z.object({
+  messageIndex: z.number().int(),
+  checker: z.string(),
+  reason: z.string(),
+  confidence: z.number(),
+  start: z.number().int(),
+  end: z.number().int(),
 });
 
 const bearer = [{ bearerAuth: [] }];
@@ -97,7 +115,7 @@ export const openApiDoc = {
         tags: ["OpenAI-compatible"],
         summary: "Create a chat completion",
         description:
-          '`model` is `"<backend slug>/<model>"`, or a bare `"<model>"` for the default backend. With `stream: true` the response is Server-Sent Events of completion chunks, ending in `data: [DONE]`.',
+          '`model` is `"<backend slug>/<model>"`, or a bare `"<model>"` for the default backend. With `stream: true` the response is Server-Sent Events of completion chunks, ending in `data: [DONE]`.\n\nUser messages are checked against the detection policy (`/settings/detection-policy`): detections at or above `blockAt` reject the request, those at or above `warnAt` let it through and are listed in the `X-PII-Warnings` header. Stored messages have every detected span masked.',
         security: bearer,
         requestBody: {
           required: true,
@@ -115,12 +133,29 @@ export const openApiDoc = {
           ...unauthorized,
           200: {
             description: "Completion, or an SSE stream when `stream` is true",
+            headers: {
+              "X-PII-Warnings": {
+                description: "Present when something reached `warnAt` but not `blockAt`: a JSON array of detections",
+                schema: { type: "string" },
+              },
+            },
             content: {
               ...json(completionsResponse),
               "text/event-stream": { schema: z.toJSONSchema(completionsChunk) },
             },
           },
-          400: error("Invalid request, or PII was detected (`type: pii_detected`)"),
+          400: {
+            description: "Invalid request, or sensitive information reached `blockAt` (`type: pii_detected`, with `detections`)",
+            content: json(
+              z.object({
+                error: z.object({
+                  message: z.string(),
+                  type: z.string(),
+                  detections: z.array(flaggedDetection).optional(),
+                }),
+              }),
+            ),
+          },
           503: error("The LLM detector is enabled but couldn't answer, and fails closed (`type: detector_unavailable`)"),
           404: error("No enabled backend matches the model's slug"),
           502: error("Backend unreachable or rejected our credentials"),
@@ -203,7 +238,7 @@ export const openApiDoc = {
         tags: ["Settings"],
         summary: "Change the local-LLM PII detector settings",
         description:
-          "Only one model does this job. `backendId` must be a `local` backend, since the detector sees every prompt. `failMode: block` (default) rejects requests with 503 when the detector can't answer; `allow` lets them through. Findings under `minConfidence` are ignored. `instructions` is appended to the detector's prompt for company-specific rules.",
+          "Only one model does this job. `backendId` must be a `local` backend, since the detector sees every prompt. `failMode: block` (default) rejects requests with 503 when the detector can't answer; `allow` lets them through. Whether findings warn or block is set by `/settings/detection-policy` under the `local-llm` checker. `instructions` is appended to the detector's prompt for company-specific rules.",
         security: bearer,
         requestBody: {
           required: true,
@@ -218,6 +253,76 @@ export const openApiDoc = {
           ...adminOnly,
           200: { description: "Updated settings", content: json(llmDetector) },
           400: { description: "Invalid request, unknown or non-local backend, or enabled without backend/model" },
+        },
+      },
+    },
+    "/settings/detection-policy": {
+      get: {
+        tags: ["Settings"],
+        summary: "Get the warn/block thresholds",
+        description:
+          "Detections carry a confidence from 0 to 1. At or above `blockAt` the request is rejected; at or above `warnAt` it goes through with a warning; below both it's only recorded. `null` means never. `checkers` lists every checker with its effective thresholds; `overridden` ones don't follow the global values.",
+        security: bearer,
+        responses: { ...adminOnly, 200: { description: "Policy", content: json(detectionPolicy) } },
+      },
+      patch: {
+        tags: ["Settings"],
+        summary: "Change the global warn/block thresholds",
+        security: bearer,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: z.toJSONSchema(updateDefaultsSchema, { io: "input" }),
+              example: { warnAt: 0.5, blockAt: 0.8 },
+            },
+          },
+        },
+        responses: {
+          ...adminOnly,
+          200: { description: "Updated policy", content: json(detectionPolicy) },
+          400: { description: "Invalid thresholds, or warnAt above blockAt" },
+        },
+      },
+    },
+    "/settings/detection-policy/checkers/{checker}": {
+      parameters: [
+        {
+          name: "checker",
+          in: "path",
+          required: true,
+          description: "Checker name, as listed by GET /settings/detection-policy",
+          schema: { type: "string" },
+        },
+      ],
+      put: {
+        tags: ["Settings"],
+        summary: "Override the thresholds for one checker",
+        description: "Both fields are required; `null` means never. E.g. `{\"warnAt\": 0.5, \"blockAt\": null}` makes phone numbers warn but never block.",
+        security: bearer,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: z.toJSONSchema(thresholdsSchema, { io: "input" }),
+              example: { warnAt: 0.5, blockAt: null },
+            },
+          },
+        },
+        responses: {
+          ...adminOnly,
+          200: { description: "Updated policy", content: json(detectionPolicy) },
+          400: { description: "Unknown checker or invalid thresholds" },
+        },
+      },
+      delete: {
+        tags: ["Settings"],
+        summary: "Remove a checker's override so it follows the global thresholds",
+        security: bearer,
+        responses: {
+          ...adminOnly,
+          200: { description: "Updated policy", content: json(detectionPolicy) },
+          400: { description: "Unknown checker" },
         },
       },
     },

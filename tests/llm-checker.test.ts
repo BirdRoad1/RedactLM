@@ -35,7 +35,7 @@ describe("locateFindings", () => {
   const text = "Client Jane Smith (jane smith on the old form) wants to move $2M.";
 
   test("finds every occurrence, case-insensitively, with positions", () => {
-    const detections = locateFindings(text, { findings: [finding("Jane Smith")] }, 0.5);
+    const detections = locateFindings(text, { findings: [finding("Jane Smith")] });
     expect(detections.map((d) => [d.contents, d.start, d.end])).toEqual([
       ["Jane Smith", 7, 17],
       ["jane smith", 19, 29],
@@ -45,21 +45,17 @@ describe("locateFindings", () => {
   });
 
   test("drops findings that aren't in the text", () => {
-    expect(locateFindings(text, { findings: [finding("John Doe")] }, 0.5)).toEqual([]);
-  });
-
-  test("drops findings under minConfidence", () => {
-    expect(locateFindings(text, { findings: [finding("Jane Smith", 0.4)] }, 0.5)).toEqual([]);
+    expect(locateFindings(text, { findings: [finding("John Doe")] })).toEqual([]);
   });
 
   test("clamps confidence and maps unknown categories", () => {
-    const [d] = locateFindings(text, { findings: [finding("Jane Smith", 7, "made_up")] }, 0.5);
+    const [d] = locateFindings(text, { findings: [finding("Jane Smith", 7, "made_up")] });
     expect(d?.confidence).toBe(1);
     expect(d?.reason).toStartWith("other_pii:");
   });
 
   test("ignores empty and one-character findings", () => {
-    expect(locateFindings(text, { findings: [finding(" "), finding("a")] }, 0)).toEqual([]);
+    expect(locateFindings(text, { findings: [finding(" "), finding("a")] })).toEqual([]);
   });
 });
 

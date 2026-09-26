@@ -11,7 +11,7 @@ export const usersTable = pgTable("users", {
 });
 
 export const roleEnum = pgEnum("message_role", ["system", "developer", "user", "assistant", "tool"]);
-export const actionEnum = pgEnum("message_action", ["allowed", "redacted", "blocked"]);
+export const actionEnum = pgEnum("message_action", ["allowed", "warned", "redacted", "blocked"]);
 
 export const conversationsTable = pgTable("conversations", {
     id: uuid().primaryKey().defaultRandom(),
@@ -34,7 +34,7 @@ export const messagesTable = pgTable("messages", {
     position: integer().notNull(),   // order within the conversation: 0, 1, 2...
     role: roleEnum().notNull(),
 
-    content: text(),                 // REDACTED text, i.e. what actually left the building
+    content: text(),                 // with every detected span masked; never the raw sensitive text
     tool_calls: jsonb(),             // assistant tool calls, OpenAI shape
     tool_call_id: text(),            // for role = "tool"
     request_id: text(),              // chatcmpl-... id of the request that added it
@@ -79,10 +79,45 @@ export const llmDetectorTable = pgTable("llm_detector", {
     backendId: integer("backend_id").references(() => backendsTable.id, { onDelete: "set null" }),
     model: text(),                                              // model name on that backend, without the slug
     failMode: failModeEnum("fail_mode").notNull().default("block"), // what to do when the detector can't answer
-    minConfidence: real("min_confidence").notNull().default(0.5),   // findings below this are ignored
     timeoutMs: integer("timeout_ms").notNull().default(15_000),
     instructions: text(),                                       // extra business-specific guidance for the model
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 }, (t) => [
     check("llm_detector_single_row", sql`${t.id} = 1`),
+]);
+
+// Confidence thresholds deciding what happens to a detection. null = never.
+// Single row (id = 1) of global defaults; checker_policies overrides per checker.
+export const detectionPolicyTable = pgTable("detection_policy", {
+    id: integer().primaryKey().default(1),
+    warnAt: real("warn_at").default(0.3),
+    blockAt: real("block_at").default(0.5),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, (t) => [
+    check("detection_policy_single_row", sql`${t.id} = 1`),
+]);
+
+// Replaces the global thresholds for one checker ("ssn", "phone", "local-llm", ...).
+// No row = use the global thresholds.
+export const checkerPoliciesTable = pgTable("checker_policies", {
+    checker: varchar({ length: 64 }).primaryKey(),
+    warnAt: real("warn_at"),
+    blockAt: real("block_at"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export const outcomeEnum = pgEnum("detection_outcome", ["ignored", "warned", "blocked"]);
+
+// What was found in a message, without the sensitive text itself
+export const messageDetectionsTable = pgTable("message_detections", {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    messageId: integer("message_id").notNull().references(() => messagesTable.id, { onDelete: "cascade" }),
+    checker: varchar({ length: 64 }).notNull(),
+    userFacingReason: text("user_facing_reason").notNull(),
+    confidence: real().notNull(),
+    start: integer().notNull(),      // position in the original text, before masking
+    end: integer().notNull(),
+    outcome: outcomeEnum().notNull(),
+}, (t) => [
+    index("message_detections_message_idx").on(t.messageId),
 ]);

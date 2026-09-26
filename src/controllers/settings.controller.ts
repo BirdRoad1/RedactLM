@@ -1,5 +1,10 @@
 import type { Context } from "hono";
+import {
+  thresholdsSchema,
+  updateDefaultsSchema,
+} from "../schema/detection-policy.schema";
 import { updateLlmDetectorSchema } from "../schema/llm-detector.schema";
+import * as detectionPolicyService from "../services/detection-policy.service";
 import * as llmDetectorService from "../services/llm-detector.service";
 
 export async function getLlmDetector(c: Context) {
@@ -16,6 +21,45 @@ export async function updateLlmDetector(c: Context) {
     return c.json(await llmDetectorService.updateLlmDetectorConfig(parsed.data));
   } catch (err) {
     if (err instanceof llmDetectorService.InvalidDetectorConfigError) {
+      return c.json({ error: err.message }, 400);
+    }
+    throw err;
+  }
+}
+
+export async function getDetectionPolicy(c: Context) {
+  return c.json(await detectionPolicyService.describePolicy());
+}
+
+export async function updateDetectionDefaults(c: Context) {
+  const parsed = await updateDefaultsSchema.safeParseAsync(await c.req.json());
+  if (parsed.error) {
+    return c.json({ error: "Invalid request", issues: parsed.error.issues }, 400);
+  }
+  return policyResponse(c, () => detectionPolicyService.updateDefaults(parsed.data));
+}
+
+export async function setCheckerPolicy(c: Context) {
+  const parsed = await thresholdsSchema.safeParseAsync(await c.req.json());
+  if (parsed.error) {
+    return c.json({ error: "Invalid request", issues: parsed.error.issues }, 400);
+  }
+  return policyResponse(c, () =>
+    detectionPolicyService.setCheckerOverride(c.req.param("checker")!, parsed.data),
+  );
+}
+
+export async function deleteCheckerPolicy(c: Context) {
+  return policyResponse(c, () =>
+    detectionPolicyService.deleteCheckerOverride(c.req.param("checker")!),
+  );
+}
+
+async function policyResponse(c: Context, run: () => Promise<unknown>) {
+  try {
+    return c.json(await run());
+  } catch (err) {
+    if (err instanceof detectionPolicyService.InvalidPolicyError) {
       return c.json({ error: err.message }, 400);
     }
     throw err;

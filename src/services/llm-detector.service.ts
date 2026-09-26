@@ -14,7 +14,6 @@ const defaults: LlmDetectorConfig = {
   backendId: null,
   model: null,
   failMode: "block",
-  minConfidence: 0.5,
   timeoutMs: 15_000,
   instructions: null,
   updatedAt: new Date(0),
