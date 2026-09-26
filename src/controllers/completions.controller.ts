@@ -17,7 +17,10 @@ import {
 } from "../services/completion-stream";
 import {
   createConversation,
+  getOwnedConversation,
+  nextPosition,
   saveMessage,
+  touchConversation,
 } from "../services/conversations.service";
 import { getPolicy } from "../services/detection-policy.service";
 import { scanStatic, scanText, type Scan } from "../services/scan.service";
@@ -95,6 +98,14 @@ export async function createCompletion(c: Context<AuthEnv>) {
     );
   }
 
+  // Continuing a conversation: clients that keep history (our web UI) send its
+  // id, and only the newest message gets stored. Otherwise each request is a
+  // new conversation holding everything it was sent.
+  const continuing = c.req.header("X-Conversation-Id");
+  if (continuing && !(await getOwnedConversation(userId, continuing))) {
+    return c.json(apiError("Conversation not found", "conversation_not_found"), 404);
+  }
+
   // Validate everything before any detector calls or DB writes
   // TODO: support content given as an array of parts
   const messages = [];
@@ -123,9 +134,11 @@ export async function createCompletion(c: Context<AuthEnv>) {
     throw err;
   }
 
-  const convo = await createConversation(userId, userAgent);
-  let position = 0;
+  const convo = continuing ?? (await createConversation(userId, userAgent));
+  let position = continuing ? await nextPosition(convo) : 0;
+  const firstToSave = continuing ? messages.length - 1 : 0;
   for (const [i, message] of messages.entries()) {
+    if (i < firstToSave) continue;
     await saveMessage(
       {
         conversation_id: convo,
@@ -138,6 +151,8 @@ export async function createCompletion(c: Context<AuthEnv>) {
       scans[i]?.scored,
     );
   }
+  await touchConversation(convo);
+  c.header("X-Conversation-Id", convo);
 
   const blocked = flagged(scans, "blocked");
   if (blocked.length) {
@@ -199,6 +214,7 @@ export async function createCompletion(c: Context<AuthEnv>) {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
           ...warningHeaders,
+          "X-Conversation-Id": convo,
         },
       });
     }

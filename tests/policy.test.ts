@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { DetectionType, type Detection } from "../src/checkers/checker";
 import { outcomeFor, redact, worstOutcome, type Policy } from "../src/checkers/policy";
 
-const detection = (checker: string, confidence: number, start = 0, end = 1): Detection => ({
+const detection = (checker: string, confidence: number, start = 0, end = 1, title = checker): Detection => ({
   checker,
   contents: "",
   start,
@@ -10,7 +10,7 @@ const detection = (checker: string, confidence: number, start = 0, end = 1): Det
   confidence,
   reason: "",
   userFacingReason: "",
-  title: "",
+  title,
   explanation: "",
   type: DetectionType.STATIC,
 });
@@ -48,26 +48,26 @@ describe("redact", () => {
   const text = "SSN 123-45-6789, call 212-555-1234.";
 
   test("masks each span", () => {
-    expect(redact(text, [detection("ssn", 1, 4, 15), detection("phone", 1, 22, 34)])).toBe(
-      "SSN [REDACTED:ssn], call [REDACTED:phone].",
+    expect(redact(text, [detection("ssn", 1, 4, 15, "SSN"), detection("phone", 1, 22, 34, "Phone number")])).toBe(
+      "SSN [REDACTED: SSN], call [REDACTED: Phone number].",
     );
   });
 
   test("order of detections doesn't matter", () => {
     expect(redact(text, [detection("phone", 1, 22, 34), detection("ssn", 1, 4, 15)])).toBe(
-      "SSN [REDACTED:ssn], call [REDACTED:phone].",
+      "SSN [REDACTED: ssn], call [REDACTED: phone].",
     );
   });
 
   test("overlapping and nested spans become one mask", () => {
     expect(redact("abcdefghij", [detection("a", 1, 2, 6), detection("b", 1, 4, 8), detection("c", 1, 5, 6)])).toBe(
-      "ab[REDACTED:a]ij",
+      "ab[REDACTED: a]ij",
     );
   });
 
   test("adjacent spans stay separate", () => {
     expect(redact("abcdef", [detection("a", 1, 0, 3), detection("b", 1, 3, 6)])).toBe(
-      "[REDACTED:a][REDACTED:b]",
+      "[REDACTED: a][REDACTED: b]",
     );
   });
 

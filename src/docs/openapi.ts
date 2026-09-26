@@ -144,10 +144,65 @@ export const openApiDoc = {
         },
       },
     },
+    "/conversations": {
+      get: {
+        tags: ["Conversations"],
+        summary: "Your conversations, newest first",
+        description: "Only conversations where something was actually sent are listed. Titles come from the first sent message, with sensitive parts masked.",
+        security: bearer,
+        responses: {
+          ...unauthorized,
+          200: {
+            description: "Conversations",
+            content: json(z.array(z.object({ id: z.string(), title: z.string(), updatedAt: z.string() }))),
+          },
+        },
+      },
+    },
+    "/conversations/{id}": {
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+      get: {
+        tags: ["Conversations"],
+        summary: "One of your conversations",
+        description: "Messages as stored: detected sensitive parts appear as `[REDACTED: <what it was>]`. Blocked attempts are left out, since they were never sent.",
+        security: bearer,
+        responses: {
+          ...unauthorized,
+          200: {
+            description: "Conversation",
+            content: json(
+              z.object({
+                id: z.string(),
+                title: z.string().nullable(),
+                updatedAt: z.string(),
+                model: z.string().nullable(),
+                messages: z.array(z.object({ role: z.string(), content: z.string(), action: z.string() })),
+              }),
+            ),
+          },
+          404: { description: "Not found, or not yours" },
+        },
+      },
+      delete: {
+        tags: ["Conversations"],
+        summary: "Delete one of your conversations",
+        security: bearer,
+        responses: { ...unauthorized, 204: { description: "Deleted" }, 404: { description: "Not found, or not yours" } },
+      },
+    },
     "/v1/chat/completions": {
       post: {
         tags: ["OpenAI-compatible"],
         summary: "Create a chat completion",
+        parameters: [
+          {
+            name: "X-Conversation-Id",
+            in: "header",
+            required: false,
+            description: "Continue this conversation: only the last message is stored. Without it, a new conversation is created from all messages. The response's X-Conversation-Id header says which conversation was used.",
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
         description:
           '`model` is `"<backend slug>/<model>"`, or a bare `"<model>"` for the default backend. With `stream: true` the response is Server-Sent Events of completion chunks, ending in `data: [DONE]`.\n\nUser messages are checked against the detection policy (`/settings/detection-policy`): detections at or above `blockAt` reject the request, those at or above `warnAt` let it through and are listed in the `X-PII-Warnings` header. Stored messages have every detected span masked.',
         security: bearer,
@@ -191,7 +246,7 @@ export const openApiDoc = {
             ),
           },
           503: error("The LLM detector is enabled but couldn't answer, and fails closed (`type: detector_unavailable`)"),
-          404: error("No enabled backend matches the model's slug"),
+          404: error("No enabled backend matches the model's slug, or X-Conversation-Id isn't one of yours"),
           502: error("Backend unreachable or rejected our credentials"),
           504: error("Backend timed out"),
         },

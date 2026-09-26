@@ -19,6 +19,7 @@ export const conversationsTable = pgTable("conversations", {
         .notNull()
         .references(() => usersTable.id, { onDelete: "restrict" }),
     client: text(), // "jan", "our-frontend", ... from User-Agent or a header
+    title: text(),  // from the first message that was actually sent; null until then
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
         .notNull()

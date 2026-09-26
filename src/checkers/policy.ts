@@ -24,21 +24,22 @@ export function worstOutcome(outcomes: Outcome[]): Outcome {
 }
 
 // Masks every detected span, whatever its outcome: anything a checker flagged
-// is kept out of storage. Overlapping spans are merged into one mask.
+// is kept out of storage. Overlapping spans are merged into one mask, which
+// reads like "[REDACTED: Phone number]".
 export function redact(text: string, detections: Detection[]) {
   const spans = detections
-    .map((d) => ({ start: d.start, end: d.end, checker: d.checker }))
+    .map((d) => ({ start: d.start, end: d.end, title: d.title }))
     .sort((a, b) => a.start - b.start);
 
   let out = "";
   let cursor = 0;
   for (let i = 0; i < spans.length; ) {
-    const { start, checker } = spans[i]!;
+    const { start, title } = spans[i]!;
     let end = spans[i]!.end;
     // absorb every span that overlaps the current one
     while (++i < spans.length && spans[i]!.start < end) end = Math.max(end, spans[i]!.end);
 
-    out += text.slice(cursor, Math.max(start, cursor)) + `[REDACTED:${checker}]`;
+    out += text.slice(cursor, Math.max(start, cursor)) + `[REDACTED: ${title}]`;
     cursor = Math.max(cursor, end);
   }
   return out + text.slice(cursor);
