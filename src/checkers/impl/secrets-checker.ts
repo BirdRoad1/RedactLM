@@ -23,4 +23,8 @@ export default buildRegexChecker('secret', [
     { expression: /\beyJ[\w-]{10,}\.eyJ[\w-]{10,}\.[\w-]{10,}/g, confidence: Confidence.PROBABLY },
     // Credentials in connection strings: postgres://user:pass@host
     { expression: /\b[a-z][a-z0-9+.-]*:\/\/[^\s:@/]+:[^\s@/]+@[^\s/]+/gi, confidence: Confidence.ABSOLUTELY },
-], 'Secret: This looks like an API key, token, private key or password');
+], {
+    title: "Password or access key",
+    userFacingReason: "This looks like a password, access key or token.",
+    explanation: "Anyone who sees a key or password can use it to get into our systems. Remove it, and have it changed if it was shared anywhere.",
+});

@@ -9,6 +9,7 @@ import {
 import { completionsRequest } from "../schema/completions-request.schema";
 import { modelsList } from "../schema/models-request.schema";
 import { thresholdsSchema, updateDefaultsSchema } from "../schema/detection-policy.schema";
+import { checkRequestSchema, checkResponseSchema } from "../schema/check.schema";
 import { updateLlmDetectorSchema } from "../schema/llm-detector.schema";
 import { createUserSchema } from "../schema/user.schema";
 
@@ -73,7 +74,9 @@ const detectionPolicy = z.object({
 const flaggedDetection = z.object({
   messageIndex: z.number().int(),
   checker: z.string(),
+  title: z.string(),
   reason: z.string(),
+  explanation: z.string(),
   confidence: z.number(),
   start: z.number().int(),
   end: z.number().int(),
@@ -116,6 +119,29 @@ export const openApiDoc = {
         summary: "The logged-in user",
         security: bearer,
         responses: { ...unauthorized, 200: { description: "User", content: json(user) } },
+      },
+    },
+    "/check": {
+      post: {
+        tags: ["Checks"],
+        summary: "Check text while it's being typed",
+        description:
+          "Runs the static checks only: no model is called and nothing is stored, so it's cheap enough to call as the user types (debounce it). Returns issues that would warn or block under the current detection policy, in plain language. The LLM detector still runs when the message is actually sent, so sending can find more.",
+        security: bearer,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: z.toJSONSchema(checkRequestSchema, { io: "input" }),
+              example: { text: "Call me at 212-555-1234" },
+            },
+          },
+        },
+        responses: {
+          ...unauthorized,
+          200: { description: "Issues found", content: json(checkResponseSchema) },
+          400: { description: "Missing or too-long text" },
+        },
       },
     },
     "/v1/chat/completions": {

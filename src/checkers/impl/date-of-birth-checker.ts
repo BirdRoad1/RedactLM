@@ -7,4 +7,8 @@ const label = String.raw`\b(?:dob|d\.o\.b\.?|date of birth|birth ?date|birthday|
 
 export default buildRegexChecker('date-of-birth', [
     { expression: new RegExp(String.raw`(?<=${label}[\s:,-]{0,3})${date}`, 'gi'), confidence: Confidence.PROBABLY },
-], 'PII: This looks like a date of birth');
+], {
+    title: "Date of birth",
+    userFacingReason: "This looks like a date of birth.",
+    explanation: "Together with a name, a birth date is enough to identify someone and is often used to verify identity. Leave it out or use an age range.",
+});

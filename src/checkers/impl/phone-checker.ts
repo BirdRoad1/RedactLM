@@ -13,4 +13,8 @@ export default buildRegexChecker('phone', [
         expression: /(?<![\w+])\+(?:[2-9]\d{0,2})(?:[ .-]?\d){6,13}(?![\w-])/g,
         confidence: Confidence.MAYBE,
     },
-], 'PII: This looks like a phone number');
+], {
+    title: "Phone number",
+    userFacingReason: "This looks like a phone number.",
+    explanation: "Phone numbers identify people. Use a placeholder such as 555-0100 instead.",
+});

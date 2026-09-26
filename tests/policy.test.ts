@@ -10,6 +10,8 @@ const detection = (checker: string, confidence: number, start = 0, end = 1): Det
   confidence,
   reason: "",
   userFacingReason: "",
+  title: "",
+  explanation: "",
   type: DetectionType.STATIC,
 });
 

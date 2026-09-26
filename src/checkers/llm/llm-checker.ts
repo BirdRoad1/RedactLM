@@ -8,7 +8,7 @@ import {
   type LlmDetectorConfig,
 } from "../../services/llm-detector.service";
 import { upstreamJson } from "../../services/upstream.service";
-import { DetectionType, type Detection } from "../checker";
+import { DetectionType, type Detection, type IssueWording } from "../checker";
 
 export const CHECKER_NAME = "local-llm";
 
@@ -16,16 +16,52 @@ export const CHECKER_NAME = "local-llm";
 export class LlmDetectorUnavailableError extends Error {}
 
 const categories = {
-  person_name: "PII: This looks like the name of a private individual",
-  contact: "PII: This looks like personal contact information",
-  government_id: "PII: This looks like a government-issued ID number",
-  financial_account: "PII: This looks like personal financial account information",
-  date_of_birth: "PII: This looks like a date of birth",
-  health: "PII: This looks like personal health information",
-  credential: "Secret: This looks like a password, key or token",
-  confidential_business: "Confidential: This looks like non-public company information",
-  other_pii: "PII: This looks like information that identifies a person",
-} as const;
+  person_name: {
+    title: "Person's name",
+    userFacingReason: "This looks like the name of a client, employee or other private person.",
+    explanation: "Names tie everything else in the message to a real person. Use a placeholder such as \"the client\" or \"Person A\" instead.",
+  },
+  contact: {
+    title: "Contact details",
+    userFacingReason: "This looks like someone's personal contact details.",
+    explanation: "Addresses, phone numbers and personal emails identify people and where to find them. Use a placeholder instead.",
+  },
+  government_id: {
+    title: "Government ID number",
+    userFacingReason: "This looks like a government-issued ID number.",
+    explanation: "ID numbers such as passport, license or tax numbers identify a person and are used in identity theft. Leave them out.",
+  },
+  financial_account: {
+    title: "Financial account details",
+    userFacingReason: "This looks like someone's financial account details.",
+    explanation: "Account numbers, balances and holdings tied to a person are confidential client information. Describe the situation without them.",
+  },
+  date_of_birth: {
+    title: "Date of birth",
+    userFacingReason: "This looks like a date of birth.",
+    explanation: "Together with a name, a birth date is enough to identify someone. Leave it out or use an age range.",
+  },
+  health: {
+    title: "Health information",
+    userFacingReason: "This looks like someone's health information.",
+    explanation: "Medical details about a person are especially sensitive and legally protected. Leave out anything that ties them to a person.",
+  },
+  credential: {
+    title: "Password or access key",
+    userFacingReason: "This looks like a password, access key or token.",
+    explanation: "Anyone who sees a key or password can use it to get into our systems. Remove it, and have it changed if it was shared anywhere.",
+  },
+  confidential_business: {
+    title: "Confidential company information",
+    userFacingReason: "This looks like non-public company information.",
+    explanation: "Unannounced deals, earnings and internal project names must not leave the company. Describe the task in general terms instead.",
+  },
+  other_pii: {
+    title: "Personal information",
+    userFacingReason: "This looks like information that identifies a person.",
+    explanation: "Details that point to a specific person shouldn't be shared with outside AI services. Remove or generalize them.",
+  },
+} as const satisfies Record<string, IssueWording>;
 
 const SYSTEM_PROMPT = `You are a data-loss-prevention filter at a financial services company. You receive a message an employee wants to send to an external AI service, and you find the sensitive information in it that must not leave the company.
 
@@ -139,7 +175,7 @@ export function locateFindings(text: string, findings: LlmFindings) {
         end: at + needle.length,
         confidence,
         reason: `${category}: ${finding.reason ?? "flagged by local LLM"}`,
-        userFacingReason: categories[category],
+        ...categories[category],
         type: DetectionType.LOCAL_LLM,
       });
     }

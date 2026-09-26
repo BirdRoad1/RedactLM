@@ -16,4 +16,8 @@ export default buildRegexChecker('bank-account', [
         expression: /(?<=\b(?:account|acct\.?)(?: number| no\.?| #|#)[\s:#.]{0,3})\d(?:-?\d){5,16}(?![\d-])/gi,
         confidence: Confidence.PROBABLY,
     },
-], 'PII: This looks like a bank account or routing number');
+], {
+    title: "Bank account details",
+    userFacingReason: "This looks like a bank account or routing number.",
+    explanation: "Account and routing numbers give access to someone's money and must stay inside the company. Leave them out.",
+});

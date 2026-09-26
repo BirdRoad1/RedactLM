@@ -11,10 +11,15 @@ export interface Detection {
     start: number;
     end: number;
     confidence: number; // 0-1
-    reason: string;
-    userFacingReason: string;
+    reason: string;           // technical, for logs: which rule matched
+    userFacingReason: string; // one sentence, e.g. "This looks like a phone number."
+    title: string;            // short name for the issue, e.g. "Phone number"
+    explanation: string;      // why it matters and what to do instead
     type: DetectionType;
 }
+
+// Plain-language wording shown to people; never checker names or numbers
+export type IssueWording = Pick<Detection, "title" | "userFacingReason" | "explanation">;
 
 
 // check: (prompt: string) => { // TODO: file support
@@ -33,7 +38,7 @@ export type RegexCheck = {
     validate?: (match: string) => boolean;
 }
 
-export function buildRegexChecker(name: string, expressions: RegexCheck[], userFacingReason: string): Checker {
+export function buildRegexChecker(name: string, expressions: RegexCheck[], wording: IssueWording): Checker {
     return {
         name,
         check(prompt) {
@@ -52,7 +57,7 @@ export function buildRegexChecker(name: string, expressions: RegexCheck[], userF
                         end: m.index + m[0].length,
                         reason: 'Matched regex rule: ' + String(regex.expression),
                         type: DetectionType.STATIC,
-                        userFacingReason: userFacingReason
+                        ...wording,
                     });
                 })
 

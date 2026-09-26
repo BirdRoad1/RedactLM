@@ -41,7 +41,8 @@ describe("locateFindings", () => {
       ["jane smith", 19, 29],
     ]);
     expect(detections[0]?.checker).toBe("local-llm");
-    expect(detections[0]?.userFacingReason).toContain("private individual");
+    expect(detections[0]?.title).toBe("Person's name");
+    expect(detections[0]?.userFacingReason).toContain("private person");
   });
 
   test("drops findings that aren't in the text", () => {

@@ -42,7 +42,9 @@ const actionFor = {
 type FlaggedDetection = {
   messageIndex: number;
   checker: string;
+  title: string;
   reason: string;
+  explanation: string;
   confidence: number;
   start: number;
   end: number;
@@ -55,7 +57,9 @@ function flagged(scans: (Scan | undefined)[], outcome: Outcome): FlaggedDetectio
       .map(({ detection: d }) => ({
         messageIndex,
         checker: d.checker,
+        title: d.title,
         reason: d.userFacingReason,
+        explanation: d.explanation,
         confidence: d.confidence,
         start: d.start,
         end: d.end,
