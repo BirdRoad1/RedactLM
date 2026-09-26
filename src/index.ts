@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { runStaticChecks } from './checkers/run-static-checks';
-import { completionsRequest } from './schema/completions.schema';
+import { completionsRequest } from './schema/completions-request.schema';
 
 const app = new Hono();
 

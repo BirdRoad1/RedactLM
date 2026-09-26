@@ -167,4 +167,4 @@ export const completionsRequest = z.object({
 });
 
 export type CompletionsRequest = z.infer<typeof completionsRequest>;
-export type Message = z.infer<typeof message>;
+export type Message = z.infer<typeof message>;export type ToolCall = z.infer<typeof toolCall>;
