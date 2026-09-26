@@ -12,6 +12,7 @@ export interface Detection {
     end: number;
     confidence: number; // 0-1
     reason: string;
+    userFacingReason: string;
     type: DetectionType;
 }
 
@@ -27,7 +28,7 @@ export type Checker = {
 
 export type RegexCheck = { expression: RegExp; confidence: Confidence }
 
-export function buildRegexChecker(name: string, expressions: RegexCheck[]): Checker {
+export function buildRegexChecker(name: string, expressions: RegexCheck[], userFacingReason: string): Checker {
     return {
         name,
         check(prompt) {
@@ -43,7 +44,8 @@ export function buildRegexChecker(name: string, expressions: RegexCheck[]): Chec
                         start: m.index,
                         end: m.index + m[0].length,
                         reason: 'Matched regex rule: ' + String(regex.expression),
-                        type: DetectionType.STATIC
+                        type: DetectionType.STATIC,
+                        userFacingReason: userFacingReason
                     });
                 })
 
