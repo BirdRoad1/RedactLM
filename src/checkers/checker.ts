@@ -26,7 +26,12 @@ export type Checker = {
     check: (prompt: string) => Detection[]; // TODO: file support
 }
 
-export type RegexCheck = { expression: RegExp; confidence: Confidence }
+export type RegexCheck = {
+    expression: RegExp;
+    confidence: Confidence;
+    // extra check on the matched text (e.g. a checksum) to cut false positives
+    validate?: (match: string) => boolean;
+}
 
 export function buildRegexChecker(name: string, expressions: RegexCheck[], userFacingReason: string): Checker {
     return {
@@ -37,6 +42,8 @@ export function buildRegexChecker(name: string, expressions: RegexCheck[], userF
                 const matches = [...prompt.matchAll(regex.expression)];
 
                 matches.forEach(m => {
+                    if (regex.validate && !regex.validate(m[0])) return;
+
                     detections.push({
                         checker: name,
                         contents: m[0],

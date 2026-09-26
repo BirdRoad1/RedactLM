@@ -3,7 +3,8 @@
   "module": "index.ts",
   "scripts": {
     "dev": "bun run --hot src/index.ts",
-    "create-admin": "bun run scripts/create-admin.ts"
+    "create-admin": "bun run scripts/create-admin.ts",
+    "test": "bun test"
   },
   "type": "module",
   "private": true,
