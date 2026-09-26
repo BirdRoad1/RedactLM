@@ -1,0 +1,2 @@
+ALTER TABLE "conversations" ALTER COLUMN "user_id" SET DATA TYPE integer USING "user_id"::integer;--> statement-breakpoint
+ALTER TABLE "conversations" ADD CONSTRAINT "conversations_user_id_users_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT;

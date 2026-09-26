@@ -7,13 +7,21 @@
   "type": "module",
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^1.0.0-rc.4",
+    "tsx": "^4.23.15"
   },
   "peerDependencies": {
     "typescript": "^7"
   },
   "dependencies": {
+    "dotenv": "^18.0.4",
+    "drizzle-orm": "^1.0.0-rc.4",
     "hono": "^4.13.9",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.0",
     "zod": "^4.6.5"
   }
 }
