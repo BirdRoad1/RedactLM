@@ -1,4 +1,8 @@
 import type { Context } from "hono";
+import {
+  LlmDetectorUnavailableError,
+  runLlmChecks,
+} from "../checkers/llm/llm-checker";
 import { runStaticChecks } from "../checkers/run-static-checks";
 import type { AuthEnv } from "../middleware/auth";
 import { completionsRequest } from "../schema/completions-request.schema";
@@ -77,7 +81,19 @@ export async function createCompletion(c: Context<AuthEnv>) {
       continue;
     }
 
-    const results = runStaticChecks(message.content);
+    // the LLM is slow and costs compute, so only ask it when the static
+    // checks didn't already find something
+    let results = runStaticChecks(message.content);
+    if (results.length === 0) {
+      try {
+        results = await runLlmChecks(message.content, c.req.raw.signal);
+      } catch (err) {
+        if (err instanceof LlmDetectorUnavailableError) {
+          return c.json(apiError(err.message, "detector_unavailable"), 503);
+        }
+        throw err;
+      }
+    }
 
     if (results.length > 0) {
       // add message, TODO: maybe check all msgs for validity before

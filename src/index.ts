@@ -7,6 +7,7 @@ import { authRoutes } from "./routes/auth.routes";
 import { v1Routes } from "./routes/v1.routes";
 import { usersRoutes } from "./routes/users.routes";
 import { backendsRoutes } from "./routes/backends.routes";
+import { settingsRoutes } from "./routes/settings.routes";
 
 const app = new Hono();
 
@@ -18,6 +19,7 @@ app.route("/auth", authRoutes);
 app.route("/v1", v1Routes);
 app.route("/users", usersRoutes);
 app.route("/backends", backendsRoutes);
+app.route("/settings", settingsRoutes);
 
 // API docs for development only
 if (env.NODE_ENV !== "production") {

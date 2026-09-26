@@ -8,6 +8,7 @@ import {
 } from "../schema/completion-response.schema";
 import { completionsRequest } from "../schema/completions-request.schema";
 import { modelsList } from "../schema/models-request.schema";
+import { updateLlmDetectorSchema } from "../schema/llm-detector.schema";
 import { createUserSchema } from "../schema/user.schema";
 
 // Hand-assembled OpenAPI doc for dev use. Bodies come from the real Zod
@@ -46,6 +47,18 @@ const user = z.object({
   username: z.string(),
   isAdmin: z.boolean(),
   createdAt: z.string(),
+});
+
+const llmDetector = z.object({
+  id: z.literal(1),
+  enabled: z.boolean(),
+  backendId: z.number().int().nullable(),
+  model: z.string().nullable(),
+  failMode: z.enum(["block", "allow"]),
+  minConfidence: z.number(),
+  timeoutMs: z.number().int(),
+  instructions: z.string().nullable(),
+  updatedAt: z.string(),
 });
 
 const bearer = [{ bearerAuth: [] }];
@@ -108,6 +121,7 @@ export const openApiDoc = {
             },
           },
           400: error("Invalid request, or PII was detected (`type: pii_detected`)"),
+          503: error("The LLM detector is enabled but couldn't answer, and fails closed (`type: detector_unavailable`)"),
           404: error("No enabled backend matches the model's slug"),
           502: error("Backend unreachable or rejected our credentials"),
           504: error("Backend timed out"),
@@ -175,6 +189,35 @@ export const openApiDoc = {
           ...adminOnly,
           200: { description: "Deleted backend", content: json(backend) },
           404: { description: "Not found" },
+        },
+      },
+    },
+    "/settings/llm-detector": {
+      get: {
+        tags: ["Settings"],
+        summary: "Get the local-LLM PII detector settings",
+        security: bearer,
+        responses: { ...adminOnly, 200: { description: "Settings", content: json(llmDetector) } },
+      },
+      patch: {
+        tags: ["Settings"],
+        summary: "Change the local-LLM PII detector settings",
+        description:
+          "Only one model does this job. `backendId` must be a `local` backend, since the detector sees every prompt. `failMode: block` (default) rejects requests with 503 when the detector can't answer; `allow` lets them through. Findings under `minConfidence` are ignored. `instructions` is appended to the detector's prompt for company-specific rules.",
+        security: bearer,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: z.toJSONSchema(updateLlmDetectorSchema, { io: "input" }),
+              example: { enabled: true, backendId: 1, model: "qwen2.5:3b" },
+            },
+          },
+        },
+        responses: {
+          ...adminOnly,
+          200: { description: "Updated settings", content: json(llmDetector) },
+          400: { description: "Invalid request, unknown or non-local backend, or enabled without backend/model" },
         },
       },
     },

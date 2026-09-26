@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 
 export const usersTable = pgTable("users", {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -67,4 +67,22 @@ export const backendsTable = pgTable("backends", {
     uniqueIndex("backends_slug_idx").on(t.slug),
     // at most one default backend
     uniqueIndex("backends_single_default_idx").on(t.isDefault).where(sql`${t.isDefault}`),
+]);
+
+export const failModeEnum = pgEnum("detector_fail_mode", ["block", "allow"]);
+
+// Settings for the local-LLM PII detector. Single row (id = 1): only one model
+// does this job at a time.
+export const llmDetectorTable = pgTable("llm_detector", {
+    id: integer().primaryKey().default(1),
+    enabled: boolean().notNull().default(false),
+    backendId: integer("backend_id").references(() => backendsTable.id, { onDelete: "set null" }),
+    model: text(),                                              // model name on that backend, without the slug
+    failMode: failModeEnum("fail_mode").notNull().default("block"), // what to do when the detector can't answer
+    minConfidence: real("min_confidence").notNull().default(0.5),   // findings below this are ignored
+    timeoutMs: integer("timeout_ms").notNull().default(15_000),
+    instructions: text(),                                       // extra business-specific guidance for the model
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, (t) => [
+    check("llm_detector_single_row", sql`${t.id} = 1`),
 ]);
