@@ -1,57 +1,24 @@
-import { Hono } from 'hono';
-import { runStaticChecks } from './checkers/run-static-checks';
-import { completionsRequest } from './schema/completions-request.schema';
-import { authRoutes } from './routes/auth.routes';
-import { usersRoutes } from './routes/users.routes';
-import { backendsRoutes } from './routes/backends.routes';
+import { Hono } from "hono";
+import { logRequests } from "./middleware/logger";
+import { authRoutes } from "./routes/auth.routes";
+import { v1Routes } from "./routes/v1.routes";
+import { usersRoutes } from "./routes/users.routes";
+import { backendsRoutes } from "./routes/backends.routes";
 
 const app = new Hono();
 
-app.post('/v1/chat/completions', async (c) => {
-    const schema = await completionsRequest.safeParseAsync(await c.req.json());
-    if (schema.error) {
-        console.log(schema.error)
-        return c.text('Invalid data', 400);
-    }
+app.use(logRequests);
 
-    const json = schema.data;
+app.get("/", (c) => c.text("OK"));
 
-    // TODO: scan tool calls and other stuff maybe
-    for (const message of json.messages) {
-        // TODO: should we skip assistant mgs?
-        if (message.role !== 'user') continue;
+app.route("/auth", authRoutes);
+app.route("/v1", v1Routes);
+app.route("/users", usersRoutes);
+app.route("/backends", backendsRoutes);
 
-        if (typeof message.content !== 'string') {
-            return c.text('Unsupported content', 400);
-        }
-
-        const results = runStaticChecks(message.content);
-
-        console.log(results);
-
-        if (results.length === 0) {
-            return c.text('All clear!');
-        } else {
-            return c.text('BAD');
-        }
-    }
-
-    return c.text("Hi");
-})
-
-app.route('/auth', authRoutes);
-app.route('/users', usersRoutes);
-app.route('/backends', backendsRoutes);
-
-app.get('/', (c) => {
-    return c.text('OK');
-});
-
-
-const results = runStaticChecks(
-    'hello world 123-12-5569'
-);
-
-console.log(results);
-
-export default app;
+export default {
+  fetch: app.fetch,
+  // Bun's default of 10s would cut off slow generations and streams that
+  // pause while the model thinks; 255 is the max
+  idleTimeout: 255,
+};
