@@ -11,6 +11,8 @@
   --warn: #8a5a00;
   --warn-bg: #fff4d6;
   --ok: #1d6b35;
+  --danger-mark: rgb(229 57 53 / 0.28);
+  --warn-mark: rgb(255 193 7 / 0.45);
   font-family: system-ui, sans-serif;
   line-height: 1.45;
   color: var(--fg);
@@ -30,6 +32,8 @@
     --warn: #ffcf66;
     --warn-bg: #3a2f14;
     --ok: #7fd89a;
+    --danger-mark: rgb(255 82 82 / 0.35);
+    --warn-mark: rgb(255 202 40 / 0.35);
   }
 }
 
@@ -74,12 +78,9 @@ main { flex: 1; padding: 1rem; max-width: 1100px; width: 100%; margin: 0 auto; }
 .cursor { animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 .composer { display: flex; gap: 0.5rem; align-items: flex-end; }
-.composer textarea { flex: 1; resize: vertical; }
 .blocked-panel { border: 1px solid var(--danger); background: var(--danger-bg); border-radius: 8px; padding: 0.6rem 0.9rem; }
 .blocked-panel p, .blocked-panel ul { margin: 0.3rem 0; }
 .blocked-panel .preview { white-space: pre-wrap; background: var(--bg); padding: 0.4rem 0.6rem; border-radius: 4px; }
-mark.blocked { background: var(--danger); color: #fff; border-radius: 2px; }
-mark.warned { background: var(--warn-bg); color: var(--warn); border-radius: 2px; }
 
 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
@@ -91,3 +92,50 @@ td button + button { margin-left: 0.4rem; }
 .inline-form { display: flex; gap: 1.5rem; align-items: end; flex-wrap: wrap; }
 .threshold { display: inline-flex; gap: 0.5rem; align-items: center; }
 .threshold input[type='number'] { width: 5.5rem; }
+
+/* Live checks: highlights drawn behind the text of the input */
+.checked-input { position: relative; flex: 1; display: grid; background: var(--bg); border-radius: 4px; }
+.checked-input > .mirror,
+.checked-input > textarea {
+  grid-area: 1 / 1;
+  margin: 0;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid transparent;
+  font: inherit;
+  line-height: 1.45;
+  letter-spacing: normal;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  scrollbar-gutter: stable;
+}
+.checked-input > .mirror { overflow: hidden; color: transparent; pointer-events: none; }
+.checked-input > textarea { position: relative; background: transparent; border-color: var(--border); resize: vertical; min-height: 4.5rem; }
+.checked-input > .mirror mark { color: transparent; border-radius: 4px; }
+
+/* roundish rectangles: the shadow grows the box without moving any text */
+mark.warned, .mirror mark.warned { background: var(--warn-mark); box-shadow: 0 0 0 2px var(--warn-mark); color: inherit; border-radius: 4px; }
+mark.blocked, .mirror mark.blocked { background: var(--danger-mark); box-shadow: 0 0 0 2px var(--danger-mark); color: inherit; border-radius: 4px; }
+.issue-mark { cursor: help; }
+
+.issue-popup {
+  position: fixed;
+  z-index: 10;
+  width: 340px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  padding: 0.7rem 0.9rem;
+  pointer-events: none;
+  font-size: 0.9rem;
+}
+.issue + .issue { border-top: 1px solid var(--border); margin-top: 0.5rem; padding-top: 0.5rem; }
+.issue-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.issue p { margin: 0.35rem 0 0; }
+.small { font-size: 0.8rem; }
+.pill { font-size: 0.75rem; border-radius: 999px; padding: 0.05rem 0.55rem; white-space: nowrap; }
+.pill.blocked { background: var(--danger); color: #fff; }
+.pill.warned { background: var(--warn-mark); color: var(--warn); }
+.live-summary { margin: -0.3rem 0 0; font-size: 0.85rem; }
+.live-summary.blocked { color: var(--danger); }
+.live-summary.warned { color: var(--warn); }

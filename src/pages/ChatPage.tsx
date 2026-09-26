@@ -1,13 +1,21 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { BlockedError, streamChat } from '../api/chat'
 import { api } from '../api/client'
-import type { ChatMessage, FlaggedDetection, Model } from '../api/types'
+import type { ChatMessage, FlaggedDetection, Issue, Model } from '../api/types'
+import { CheckedTextarea } from '../components/CheckedTextarea'
 import { HighlightedText } from '../components/HighlightedText'
+import { outcomeLabel } from '../components/issues'
+import { useLiveCheck } from '../hooks/useLiveCheck'
 
-type Entry = ChatMessage & { warnings?: FlaggedDetection[] }
+type Entry = ChatMessage & { warnings?: Issue[] }
 
 // Where the draft was blocked; shown until the user edits it
-type Blocked = { message: string; draft: string; spans: FlaggedDetection[] }
+type Blocked = { draft: string; issues: Issue[] }
+
+const asIssues = (detections: FlaggedDetection[], outcome: Issue['outcome']): Issue[] =>
+  detections.map(({ start, end, title, reason, explanation, confidence }) => ({
+    start, end, outcome, title, reason, explanation, confidence,
+  }))
 
 export function ChatPage() {
   const [models, setModels] = useState<Model[]>([])
@@ -18,6 +26,7 @@ export function ChatPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const abort = useRef<AbortController | null>(null)
+  const liveIssues = useLiveCheck(draft)
 
   useEffect(() => {
     api<{ data: Model[] }>('/v1/models')
@@ -61,7 +70,7 @@ export function ChatPage() {
         setEntries((current) =>
           current.map((entry, i) => {
             const mine = warnings.filter((w) => w.messageIndex === i)
-            return mine.length ? { ...entry, warnings: mine } : entry
+            return mine.length ? { ...entry, warnings: asIssues(mine, 'warned') } : entry
           }),
         )
       }
@@ -73,8 +82,8 @@ export function ChatPage() {
       setEntries(entries)
       setDraft(text)
       if (err instanceof BlockedError) {
-        const spans = err.detections.filter((d) => d.messageIndex === history.length - 1)
-        setBlocked({ message: err.message, draft: text, spans })
+        const mine = err.detections.filter((d) => d.messageIndex === history.length - 1)
+        setBlocked({ draft: text, issues: asIssues(mine, 'blocked') })
       } else {
         setError(err instanceof Error ? err.message : String(err))
       }
@@ -100,11 +109,13 @@ export function ChatPage() {
         {entries.map((entry, i) => (
           <div key={i} className={`message ${entry.role}`}>
             <div className="bubble">
-              {entry.warnings ? <HighlightedText text={entry.content} spans={entry.warnings} kind="warned" /> : entry.content}
+              {entry.warnings ? <HighlightedText text={entry.content} issues={entry.warnings} /> : entry.content}
               {entry.role === 'assistant' && busy && i === entries.length - 1 && <span className="cursor">▍</span>}
             </div>
             {entry.warnings && (
-              <p className="warning">Sent with a warning: {[...new Set(entry.warnings.map((w) => w.reason))].join('; ')}</p>
+              <p className="warning">
+                Sent with a warning: {[...new Set(entry.warnings.map((w) => w.title))].join(', ')}. Hover the highlight for details.
+              </p>
             )}
           </div>
         ))}
@@ -112,21 +123,24 @@ export function ChatPage() {
 
       {blocked && draft === blocked.draft && (
         <div className="blocked-panel">
-          <p><strong>Not sent.</strong> {blocked.message.split('\n')[0]}</p>
+          <p><strong>Not sent.</strong> Your message contains information that can't leave the company:</p>
           <ul>
-            {[...new Set(blocked.spans.map((d) => d.reason))].map((reason) => <li key={reason}>{reason}</li>)}
+            {[...new Map(blocked.issues.map((i) => [i.title, i])).values()].map((issue) => (
+              <li key={issue.title}><strong>{issue.title}.</strong> {issue.reason}</li>
+            ))}
           </ul>
           <p className="preview">
-            <HighlightedText text={blocked.draft} spans={blocked.spans} kind="blocked" />
+            <HighlightedText text={blocked.draft} issues={blocked.issues} />
           </p>
-          <p className="muted">Remove the highlighted parts and send again.</p>
+          <p className="muted">Remove or replace the highlighted parts and send again.</p>
         </div>
       )}
       {error && <p className="error">{error}</p>}
 
       <form className="composer" onSubmit={send}>
-        <textarea
+        <CheckedTextarea
           value={draft}
+          issues={liveIssues}
           placeholder="Message"
           rows={3}
           onChange={(e) => setDraft(e.target.value)}
@@ -143,6 +157,20 @@ export function ChatPage() {
           <button type="submit" disabled={!draft.trim() || !model}>Send</button>
         )}
       </form>
+      <LiveSummary issues={liveIssues} />
     </div>
+  )
+}
+
+// One line under the input saying what the highlights mean
+function LiveSummary({ issues }: { issues: Issue[] }) {
+  if (!issues.length) return null
+  const kinds = [...new Map(issues.map((i) => [i.title, i])).values()]
+  const blocking = kinds.some((i) => i.outcome === 'blocked')
+  return (
+    <p className={`live-summary ${blocking ? 'blocked' : 'warned'}`}>
+      {kinds.map((i) => `${i.title} (${outcomeLabel(i.outcome).toLowerCase()})`).join(', ')}
+      {blocking ? ". This message won't be sent as it is." : '.'} Hover the highlights for details.
+    </p>
   )
 }

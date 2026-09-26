@@ -15,14 +15,22 @@ export type Model = { id: string; owned_by: string }
 export type ChatRole = 'system' | 'user' | 'assistant'
 export type ChatMessage = { role: ChatRole; content: string }
 
-// Where and why something was flagged; never the flagged text itself
-export type FlaggedDetection = {
-  messageIndex: number
-  checker: string
-  reason: string
-  confidence: number
+// A problem in some text, in plain language. `start`/`end` locate it; the
+// flagged text itself is never sent back.
+export type Issue = {
   start: number
   end: number
+  outcome: 'warned' | 'blocked'
+  title: string // "Phone number"
+  reason: string // "This looks like a phone number."
+  explanation: string // why it matters and what to do instead
+  confidence: number
+}
+
+// An issue in a sent message, as reported by the chat endpoint
+export type FlaggedDetection = Omit<Issue, 'outcome'> & {
+  messageIndex: number
+  checker: string // internal name; not for display
 }
 
 export type Trust = 'local' | 'cloud'

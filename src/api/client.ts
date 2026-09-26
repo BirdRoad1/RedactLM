@@ -64,10 +64,11 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
   throw new ApiError(res.status, body)
 }
 
-export async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
+export async function api<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
   const res = await apiFetch(path, {
     method,
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
   })
   return (await res.json()) as T
 }
