@@ -42,11 +42,19 @@ describe("extractText (OCR, local)", () => {
     expect(found).toContain("email:m.oconnell@example.com");
   }, 60_000);
 
-  test("reads what pages show, not the PDF's text layer", async () => {
-    const pdf = await makePdf([{ text: "Visible line of text", hiddenText: "HIDDEN 987-65-4321" }]);
-    const [page] = await extractText(attachmentFromPart(file("p.pdf", dataUri("application/pdf", pdf)), 1));
-    expect(page!.text).toContain("Visible line of text");
-    expect(page!.text).not.toContain("987-65-4321"); // white-on-white: not visible, so not seen
+  test("reads both what pages show and the text stored in the file", async () => {
+    const pdf = await makePdf([
+      { image: scannedPage(["Scanned SSN 123-45-6789"]), hiddenText: "HIDDEN 987-65-4321" },
+    ]);
+    const pages = await extractText(attachmentFromPart(file("p.pdf", dataUri("application/pdf", pdf)), 1));
+    const ocr = pages.find((p) => p.from === "ocr")!;
+    const stored = pages.find((p) => p.from === "file")!;
+    // the scan has no stored text, and white-on-white text isn't visible
+    expect(ocr.text).toContain("123-45-6789");
+    expect(ocr.text).not.toContain("987-65-4321");
+    // ...but it's in the file, where an AI service could read it
+    expect(stored.text).toContain("987-65-4321");
+    expect(stored.page).toBe(1);
   }, 60_000);
 
   test("reads images and plain text", async () => {

@@ -10,8 +10,9 @@ export type Attachment = {
   bytes: Buffer;
 };
 
-// Text found in an attachment: one entry per PDF page, a single one otherwise
-export type ExtractedPage = { page?: number; text: string };
+// Text found in an attachment: for PDFs, two entries per page (what OCR sees
+// and the text stored in the file); a single one otherwise
+export type ExtractedPage = { page?: number; text: string; from: "ocr" | "file" };
 
 // Can't be checked, so it can't be sent. Messages are shown to users as-is.
 export class UnsupportedAttachmentError extends Error {}
@@ -88,14 +89,15 @@ export function attachmentFromPart(
 }
 
 async function read(attachment: Attachment): Promise<ExtractedPage[]> {
-  if (attachment.kind === "text") return [{ text: attachment.bytes.toString("utf8") }];
-  if (attachment.kind === "image") return [{ text: await ocrImage(attachment.bytes) }];
+  if (attachment.kind === "text") return [{ text: attachment.bytes.toString("utf8"), from: "file" }];
+  if (attachment.kind === "image") return [{ text: await ocrImage(attachment.bytes), from: "ocr" }];
 
-  // PDFs: OCR what each page looks like; any text layer in the file is ignored.
+  // PDFs: OCR what each page looks like, and take the text stored in it too.
   // Pages render one at a time while earlier ones are already being read.
   const pages: Promise<ExtractedPage>[] = [];
-  for await (const { page, png } of renderPdfPages(attachment.bytes, { maxPages: MAX_PDF_PAGES })) {
-    pages.push(ocrImage(png).then((text) => ({ page, text })));
+  for await (const { page, png, text } of renderPdfPages(attachment.bytes, { maxPages: MAX_PDF_PAGES })) {
+    pages.push(ocrImage(png).then((ocr) => ({ page, text: ocr, from: "ocr" as const })));
+    if (text.trim()) pages.push(Promise.resolve({ page, text, from: "file" as const }));
   }
   return Promise.all(pages);
 }

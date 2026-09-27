@@ -200,7 +200,7 @@ export const openApiDoc = {
         tags: ["Checks"],
         summary: "Check an attachment before sending it",
         description:
-          "Reads the file locally (OCR for images and each PDF page, ignoring any text layer inside the PDF; plain-text files as-is) and runs the static checks. No AI model is involved and nothing is stored. Up to 20 MB and 50 pages. Sending re-checks everything, including with the LLM detector.",
+          "Reads the file locally (OCR for images and each PDF page, plus the text stored in the PDF, which catches text that is in the file but not visible; plain-text files as-is) and runs the static checks. No AI model is involved and nothing is stored. Up to 20 MB and 50 pages. Sending re-checks everything, including with the LLM detector.",
         security: bearer,
         requestBody: {
           required: true,
@@ -232,7 +232,7 @@ export const openApiDoc = {
           },
         ],
         description:
-          '`model` is `"<backend slug>/<model>"`, or a bare `"<model>"` for the default backend. User messages may carry attachments as `file` parts with `file_data` (PDF, image or plain text, up to 20 MB / 50 pages) or `image_url` parts with a `data:` URL; they are read locally with OCR and checked like text. Linked images, file ids and other file types are refused, since they cannot be checked. With `stream: true` the response is Server-Sent Events of completion chunks, ending in `data: [DONE]`.\n\nUser messages are checked against the detection policy (`/settings/detection-policy`): detections at or above `blockAt` reject the request, those at or above `warnAt` let it through and are listed in the `X-PII-Warnings` header. Stored messages have every detected span masked.',
+          '`model` is `"<backend slug>/<model>"`, or a bare `"<model>"` for the default backend. User messages may carry attachments as `file` parts with `file_data` (PDF, image or plain text, up to 20 MB / 50 pages) or `image_url` parts with a `data:` URL; they are read locally (OCR, plus the text stored in PDFs) and checked like text. Linked images, file ids and other file types are refused, since they cannot be checked. With `stream: true` the response is Server-Sent Events of completion chunks, ending in `data: [DONE]`.\n\nUser messages are checked against the detection policy (`/settings/detection-policy`): detections at or above `blockAt` reject the request, those at or above `warnAt` let it through and are listed in the `X-PII-Warnings` header. Stored messages have every detected span masked.',
         security: bearer,
         requestBody: {
           required: true,

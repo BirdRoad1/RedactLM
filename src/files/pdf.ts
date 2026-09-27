@@ -1,8 +1,10 @@
 import { createCanvas } from "@napi-rs/canvas";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
-// Renders each page to a PNG. Only what's visible on the page matters here:
-// any text layer inside the PDF is deliberately not read.
+// Renders each page to a PNG for OCR, and also returns the text stored in the
+// page. Both are checked: OCR catches scans and text drawn as images, the
+// stored text catches what's in the file but not visible (white-on-white,
+// tiny or covered text), which AI services may still read.
 export async function* renderPdfPages(data: Uint8Array, { dpi = 300, maxPages = Infinity } = {}) {
   // a plain copy: pdf.js rejects Buffers and takes ownership of what it's given
   const task = getDocument({ data: new Uint8Array(data), disableFontFace: true, useSystemFonts: false, verbosity: 0 });
@@ -21,8 +23,12 @@ export async function* renderPdfPages(data: Uint8Array, { dpi = 300, maxPages = 
       context.fillRect(0, 0, canvas.width, canvas.height);
       // pdf.js's canvas typing is the DOM one; @napi-rs/canvas is compatible
       await page.render({ canvas: canvas as never, canvasContext: context as never, viewport }).promise;
+      const content = await page.getTextContent();
+      const text = content.items
+        .map((item) => ("str" in item ? item.str + (item.hasEOL ? "\n" : " ") : ""))
+        .join("");
       page.cleanup();
-      yield { page: n, pages: doc.numPages, png: canvas.toBuffer("image/png") };
+      yield { page: n, pages: doc.numPages, png: canvas.toBuffer("image/png"), text };
     }
   } finally {
     await task.destroy();
