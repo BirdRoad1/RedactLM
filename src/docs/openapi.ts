@@ -63,6 +63,7 @@ const llmDetector = z.object({
   model: z.string().nullable(),
   failMode: z.enum(["block", "allow"]),
   timeoutMs: z.number().int(),
+  maxChars: z.number().int(),
   instructions: z.string().nullable(),
   updatedAt: z.string(),
 });
@@ -218,6 +219,29 @@ export const openApiDoc = {
         },
       },
     },
+    "/audit-log": {
+      get: {
+        tags: ["Audit"],
+        summary: "Latest audit log entries (admins)",
+        description: "Newest first, at most 200. `summary` describes each entry in plain language; entries never contain the checked text.",
+        security: bearer,
+        responses: {
+          ...adminOnly,
+          200: {
+            description: "Entries",
+            content: json(z.array(z.object({
+              id: z.number().int(),
+              createdAt: z.string(),
+              user: z.string().nullable(),
+              conversationId: z.string().nullable(),
+              event: z.string(),
+              details: z.record(z.string(), z.unknown()),
+              summary: z.string(),
+            }))),
+          },
+        },
+      },
+    },
     "/v1/chat/completions": {
       post: {
         tags: ["OpenAI-compatible"],
@@ -251,6 +275,10 @@ export const openApiDoc = {
           200: {
             description: "Completion, or an SSE stream when `stream` is true",
             headers: {
+              "X-Partially-Checked": {
+                description: "Present when a new message or attachment was longer than the LLM detector reads (`maxChars`): it passed, but only the rule-based checks covered all of it. JSON array of `{messageIndex, source?, checkedChars, totalChars}`; also recorded in the audit log.",
+                schema: { type: "string" },
+              },
               "X-PII-Warnings": {
                 description: "Present when something reached `warnAt` but not `blockAt`: a JSON array of detections",
                 schema: { type: "string" },
@@ -355,7 +383,7 @@ export const openApiDoc = {
         tags: ["Settings"],
         summary: "Change the local-LLM PII detector settings",
         description:
-          "Only one model does this job. `backendId` must be a `local` backend, since the detector sees every prompt. `failMode: block` (default) rejects requests with 503 when the detector can't answer; `allow` lets them through. Whether findings warn or block is set by `/settings/detection-policy` under the `local-llm` checker. `instructions` is appended to the detector's prompt for company-specific rules.",
+          "Only one model does this job. `backendId` must be a `local` backend, since the detector sees every prompt. `failMode: block` (default) rejects requests with 503 when the detector can't answer; `allow` lets them through. Whether findings warn or block is set by `/settings/detection-policy` under the `local-llm` checker. It reads at most `maxChars` characters (default 10,000) of each message and of each attachment; longer ones pass as partly checked, since the rule-based checks still cover everything, and are recorded in the audit log. `instructions` is appended to the detector's prompt for company-specific rules.",
         security: bearer,
         requestBody: {
           required: true,

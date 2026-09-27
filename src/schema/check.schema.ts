@@ -24,6 +24,8 @@ export const checkFileRequestSchema = z.object({
 
 export const checkFileResponseSchema = z.object({
   pages: z.number().int().nullable(), // PDFs only
+  // set when the file is longer than the LLM detector reads on send
+  partial: z.object({ checkedChars: z.number().int(), totalChars: z.number().int() }).nullable(),
   issues: z.array(issueSchema.extend({ page: z.number().int().nullable() })),
 });
 

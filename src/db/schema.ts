@@ -81,6 +81,7 @@ export const llmDetectorTable = pgTable("llm_detector", {
     model: text(),                                              // model name on that backend, without the slug
     failMode: failModeEnum("fail_mode").notNull().default("block"), // what to do when the detector can't answer
     timeoutMs: integer("timeout_ms").notNull().default(15_000),
+    maxChars: integer("max_chars").notNull().default(10_000),   // reads at most this much of a message or file
     instructions: text(),                                       // extra business-specific guidance for the model
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 }, (t) => [
@@ -122,4 +123,17 @@ export const messageDetectionsTable = pgTable("message_detections", {
     outcome: outcomeEnum().notNull(),
 }, (t) => [
     index("message_detections_message_idx").on(t.messageId),
+]);
+
+// Things admins may need to look back at. Entries outlive the users and
+// conversations they mention.
+export const auditLogTable = pgTable("audit_log", {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    userId: integer("user_id").references(() => usersTable.id, { onDelete: "set null" }),
+    conversationId: uuid("conversation_id").references(() => conversationsTable.id, { onDelete: "set null" }),
+    event: varchar({ length: 64 }).notNull(),   // "partially_checked", ...
+    details: jsonb().notNull(),                 // never contains the checked text itself
+}, (t) => [
+    index("audit_log_created_idx").on(t.createdAt),
 ]);

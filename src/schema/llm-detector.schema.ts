@@ -7,6 +7,7 @@ export const updateLlmDetectorSchema = z
     model: z.string().trim().min(1).max(255).nullable(),
     failMode: z.enum(["block", "allow"]),
     timeoutMs: z.number().int().min(1_000).max(300_000),
+    maxChars: z.number().int().min(500).max(1_000_000),
     instructions: z.string().max(4_000).nullable(),
   })
   .partial()

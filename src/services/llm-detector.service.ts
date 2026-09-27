@@ -15,6 +15,7 @@ const defaults: LlmDetectorConfig = {
   model: null,
   failMode: "block",
   timeoutMs: 15_000,
+  maxChars: 10_000,
   instructions: null,
   updatedAt: new Date(0),
 };

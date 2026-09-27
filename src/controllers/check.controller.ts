@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { attachmentFromPart, extractText, UnsupportedAttachmentError } from "../files/extract";
 import { checkFileRequestSchema, checkRequestSchema, type Issue } from "../schema/check.schema";
 import { getPolicy } from "../services/detection-policy.service";
+import { getLlmDetectorConfig } from "../services/llm-detector.service";
 import { scanStatic } from "../services/scan.service";
 
 // Live preview while typing: static checks only (fast, free, and nothing is
@@ -46,9 +47,19 @@ export async function checkFile(c: Context) {
       1,
     );
     const pages = await extractText(attachment);
-    const policy = await getPolicy();
+    const [policy, detector] = await Promise.all([getPolicy(), getLlmDetectorConfig()]);
+
+    // how much of it the LLM detector will read when it's sent
+    const totals = { ocr: 0, file: 0 };
+    for (const p of pages) totals[p.from] += p.text.length;
+    const totalChars = Math.max(totals.ocr, totals.file);
+    const partial = detector.enabled && totalChars > detector.maxChars
+      ? { checkedChars: detector.maxChars, totalChars }
+      : null;
+
     return c.json({
-      pages: attachment.kind === "pdf" ? pages.length : null,
+      pages: attachment.kind === "pdf" ? new Set(pages.map((p) => p.page)).size : null,
+      partial,
       issues: pages.flatMap((p) => issuesIn(p.text, policy).map((issue) => ({ ...issue, page: p.page ?? null }))),
     });
   } catch (err) {

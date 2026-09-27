@@ -22,6 +22,7 @@ import {
   saveMessage,
   touchConversation,
 } from "../services/conversations.service";
+import { audit } from "../services/audit.service";
 import { getPolicy } from "../services/detection-policy.service";
 import { UnsupportedAttachmentError } from "../files/extract";
 import {
@@ -166,6 +167,7 @@ export async function createCompletion(c: Context<AuthEnv>) {
   await touchConversation(convo);
   c.header("X-Conversation-Id", convo);
 
+
   const blocked = flagged(scans, "blocked");
   if (blocked.length) {
     const reasons = [...new Set(blocked.map((d) =>
@@ -183,11 +185,22 @@ export async function createCompletion(c: Context<AuthEnv>) {
     );
   }
 
+  // Passed, but longer than the LLM detector reads. Only the newly stored
+  // messages count: history comes back every turn and was already logged.
+  const partial = messages.flatMap((_, i) =>
+    i >= firstToSave ? (scans[i]?.partial ?? []).map((p) => ({ messageIndex: i, ...p })) : [],
+  );
+  for (const details of partial) {
+    await audit({ event: "partially_checked", userId, conversationId: convo, details });
+  }
+
   // Warnings don't stop the request; clients that care (our web UI) read this header
   const warnings = flagged(scans, "warned");
-  const warningHeaders: Record<string, string> = warnings.length
-    ? { "X-PII-Warnings": asciiJson(warnings) }
-    : {};
+  // X-Partially-Checked: passed, but part of it was only covered by the rules
+  const warningHeaders: Record<string, string> = {
+    ...(warnings.length && { "X-PII-Warnings": asciiJson(warnings) }),
+    ...(partial.length && { "X-Partially-Checked": asciiJson(partial) }),
+  };
   for (const [name, value] of Object.entries(warningHeaders)) c.header(name, value);
 
   // Only fields the schema knows about are forwarded, so unvalidated extras

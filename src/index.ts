@@ -7,6 +7,7 @@ import { authRoutes } from "./routes/auth.routes";
 import { meRoutes } from "./routes/me.routes";
 import { checkRoutes } from "./routes/check.routes";
 import { conversationsRoutes } from "./routes/conversations.routes";
+import { auditRoutes } from "./routes/audit.routes";
 import { v1Routes } from "./routes/v1.routes";
 import { usersRoutes } from "./routes/users.routes";
 import { backendsRoutes } from "./routes/backends.routes";
@@ -26,6 +27,7 @@ app.route("/v1", v1Routes);
 app.route("/users", usersRoutes);
 app.route("/backends", backendsRoutes);
 app.route("/settings", settingsRoutes);
+app.route("/audit-log", auditRoutes);
 
 // API docs for development only
 if (env.NODE_ENV !== "production") {

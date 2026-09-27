@@ -8,6 +8,7 @@ import {
   type Attachment,
 } from "../files/extract";
 import type { Message } from "../schema/completions-request.schema";
+import { getLlmDetectorConfig } from "./llm-detector.service";
 
 // Where in an attachment something was found
 export type Source = { filename: string; page?: number };
@@ -18,19 +19,24 @@ export const describeSource = ({ filename, page }: Source) =>
 // `source` is set for detections in an attachment
 export type ScoredDetection = { detection: Detection; outcome: Outcome; source?: Source };
 
-export type Scan = { scored: ScoredDetection[]; outcome: Outcome };
+// Text longer than the LLM detector reads: the rule-based checks covered all
+// of it, the detector only the first `checkedChars`
+export type PartialCheck = { source?: Source; checkedChars: number; totalChars: number };
+
+export type Scan = { scored: ScoredDetection[]; outcome: Outcome; partial?: PartialCheck[] };
 
 const score = (detections: Detection[], policy: Policy) =>
   detections.map((detection) => ({ detection, outcome: outcomeFor(detection, policy) }));
 
-// Static checks, then the LLM detector unless the static checks already block
-// (it's slow, and the answer can't get any worse). Throws
-// LlmDetectorUnavailableError when the detector fails closed.
-export async function scanText(text: string, policy: Policy, signal?: AbortSignal): Promise<Scan> {
+// Static checks over all of `text`, then the LLM detector over its first
+// `llmChars` characters, unless the static checks already block (it's slow,
+// and the answer can't get any worse). Throws LlmDetectorUnavailableError
+// when the detector fails closed.
+export async function scanText(text: string, policy: Policy, signal?: AbortSignal, llmChars = Infinity): Promise<Scan> {
   const scored = score(runStaticChecks(text), policy);
 
-  if (worstOutcome(scored.map((s) => s.outcome)) !== "blocked") {
-    scored.push(...score(await runLlmChecks(text, signal), policy));
+  if (llmChars > 0 && worstOutcome(scored.map((s) => s.outcome)) !== "blocked") {
+    scored.push(...score(await runLlmChecks(text.slice(0, llmChars), signal), policy));
   }
 
   return { scored, outcome: worstOutcome(scored.map((s) => s.outcome)) };
@@ -62,12 +68,36 @@ export function prepareMessage(message: Message): PreparedMessage {
 // Checks the text and every page of every attachment. Throws
 // UnsupportedAttachmentError when a file can't be read, and
 // LlmDetectorUnavailableError when the detector fails closed.
+// The LLM detector reads at most `maxChars` of the message text and of each
+// attachment (across its pages); the rule-based checks read everything.
 export async function scanMessage(message: PreparedMessage, policy: Policy, signal?: AbortSignal): Promise<Scan> {
+  const detector = await getLlmDetectorConfig();
+  const limit = detector.enabled ? detector.maxChars : Infinity;
+  const partial: PartialCheck[] = [];
+  if (message.content.length > limit) {
+    partial.push({ checkedChars: limit, totalChars: message.content.length });
+  }
+
   const scans = await Promise.all([
-    scanText(message.content, policy, signal),
+    scanText(message.content, policy, signal, limit),
     ...message.attachments.map(async (attachment) => {
       const pages = await extractText(attachment);
-      const pageScans = await Promise.all(pages.map((p) => scanText(p.text, policy, signal)));
+
+      // one budget per way of reading the file (OCR, stored text), used up page by page
+      const left = { ocr: limit, file: limit };
+      const total = { ocr: 0, file: 0 };
+      const budgets = pages.map((p) => {
+        const budget = Math.max(0, left[p.from]);
+        left[p.from] -= p.text.length;
+        total[p.from] += p.text.length;
+        return budget;
+      });
+      const longest = Math.max(total.ocr, total.file);
+      if (longest > limit) {
+        partial.push({ source: { filename: attachment.filename }, checkedChars: limit, totalChars: longest });
+      }
+
+      const pageScans = await Promise.all(pages.map((p, i) => scanText(p.text, policy, signal, budgets[i])));
       return pageScans.flatMap((scan, i) =>
         scan.scored.map((s) => ({ ...s, source: { filename: attachment.filename, page: pages[i]!.page } })),
       );
@@ -76,5 +106,5 @@ export async function scanMessage(message: PreparedMessage, policy: Policy, sign
 
   const [text, ...files] = scans;
   const scored = [...(text as Scan).scored, ...(files as ScoredDetection[][]).flat()];
-  return { scored, outcome: worstOutcome(scored.map((s) => s.outcome)) };
+  return { scored, outcome: worstOutcome(scored.map((s) => s.outcome)), partial: partial.length ? partial : undefined };
 }
