@@ -1,7 +1,7 @@
 import { swaggerUI } from "@hono/swagger-ui";
 import { Hono, type Context } from "hono";
 import { serveStatic } from "hono/bun";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { contextStorage } from "hono/context-storage";
 import { openApiDoc } from "./docs/openapi";
@@ -70,13 +70,27 @@ if (staticDir) {
     c.header("X-Content-Type-Options", "nosniff");
     c.header("Referrer-Policy", "same-origin");
   };
+
+  // The page itself, with this deployment's address filled in: link
+  // previews (Discord, Twitter/X, Slack) need absolute URLs for the page and
+  // its preview image, and the address is only known where it's deployed.
+  // Read once at start-up.
+  const html = readFileSync(`${root}/index.html`, "utf8").replaceAll("__APP_URL__", env.APP_URL.replace(/\/$/, ""));
+  // Only the front page belongs in search results: the app's own pages
+  // (/chat, /admin/…, /login) are asked not to be indexed
+  const page = (c: Context) => {
+    headers("no-cache")("", c);
+    if (c.req.path !== "/") c.header("X-Robots-Tag", "noindex");
+    return c.html(html);
+  };
+  app.get("/", page);
+  app.get("/index.html", page);
+
   // built files have content hashes in their names, so they never change
   app.use("/assets/*", serveStatic({ root, onFound: headers("public, max-age=31536000, immutable") }));
   app.use("*", serveStatic({ root, onFound: headers("no-cache") }));
-  // (via root, like the files above: `path` is taken relative to the
-  // working directory, so an absolute STATIC_DIR like the image's breaks it)
-  const page = serveStatic({ root, rewriteRequestPath: () => "/index.html", onFound: headers("no-cache") });
-  app.get("*", (c, next) => (/^\/(api|v1)(\/|$)/.test(c.req.path) ? next() : page(c, next)));
+  // any other page path is the app, which routes on the client
+  app.get("*", (c, next) => (/^\/(api|v1)(\/|$)/.test(c.req.path) ? next() : page(c)));
 } else {
   // development: the web app runs on Vite's dev server
   app.get("/", (c) => c.text("OK"));

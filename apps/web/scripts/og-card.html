@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- The link-preview image (public/og-image.png, 1200×630): open this page in a
+     browser at 1200×630 and screenshot it, e.g. with Playwright:
+     page.setViewportSize({ width: 1200, height: 630 }); page.screenshot(...) -->
+<html><head><meta charset="utf-8">
+<style>
+  @font-face { font-family: Bricolage; src: url(../node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2) format("woff2"); font-weight: 200 800; }
+  @font-face { font-family: Jakarta; src: url(../node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 200 800; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1200px; height: 630px; }
+  body {
+    position: relative; overflow: hidden; color: #f2f4fb; font-family: Jakarta, sans-serif;
+    background:
+      radial-gradient(circle at 12% 18%, rgb(126 162 255 / 0.34), transparent 45%),
+      radial-gradient(circle at 92% 88%, rgb(124 77 255 / 0.32), transparent 50%),
+      #111522;
+  }
+  body::before {
+    content: ""; position: absolute; inset: 0;
+    background-image: radial-gradient(rgb(255 255 255 / 0.07) 1.5px, transparent 1.5px); background-size: 26px 26px;
+    mask-image: linear-gradient(to bottom, black, transparent 95%);
+  }
+  .copy { position: absolute; left: 72px; top: 70px; width: 640px; }
+  .brand { font-family: Bricolage; font-weight: 750; font-size: 34px; letter-spacing: -0.02em; display: flex; align-items: center; gap: 14px; }
+  .brand img { width: 46px; height: 46px; }
+  h1 { font-family: Bricolage; font-weight: 700; font-size: 74px; line-height: 1.02; letter-spacing: -0.035em; margin-top: 46px; }
+  .demo { margin-top: 38px; display: flex; align-items: center; gap: 16px; font-size: 25px; }
+  .value { padding: 6px 14px; border-radius: 10px; background: rgb(255 207 102 / 0.2); box-shadow: inset 0 0 0 1.5px rgb(255 207 102 / 0.55); color: #ffe2a6; font-weight: 600; }
+  .arrow { color: #7fd89a; font-size: 30px; }
+  .placeholder { padding: 6px 14px; border-radius: 10px; background: rgb(127 216 154 / 0.16); color: #a9f0c0; font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 22px; }
+  .foot { position: absolute; left: 72px; bottom: 56px; font-size: 22px; color: rgb(242 244 251 / 0.72); }
+  .foot strong { color: #f2f4fb; font-weight: 650; }
+  .crest { position: absolute; right: 70px; top: 50%; transform: translateY(-50%); width: 400px; height: 400px; filter: drop-shadow(0 24px 50px rgb(0 0 0 / 0.45)); }
+</style></head>
+<body>
+  <div class="copy">
+    <div class="brand">LLM Thingy</div>
+    <h1>Use AI without leaking what matters.</h1>
+    <div class="demo"><span class="value">SSN 529-43-1187</span><span class="arrow">→</span><span class="placeholder">redacted-3f9a1c0b7e2d</span></div>
+  </div>
+  <div class="foot"><strong>Self-hosted</strong> · works with ChatGPT, Claude and Gemini · <strong>Made at HackUMBC 2026</strong></div>
+  <img class="crest" src="../public/favicon.svg" alt="">
+</body></html>

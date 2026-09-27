@@ -1,9 +1,21 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
+
+// index.html carries __APP_URL__ where link previews need absolute URLs. In
+// production the server fills in its APP_URL; in development this does, with
+// the dev server's own address. Builds keep the placeholder for the server.
+const appUrl = (): Plugin => ({
+  name: 'app-url',
+  apply: 'serve',
+  transformIndexHtml(html, ctx) {
+    const url = process.env.APP_URL ?? `http://localhost:${ctx.server?.config.server.port ?? 5173}`
+    return html.replaceAll('__APP_URL__', url.replace(/\/$/, ''))
+  },
+})
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), appUrl()],
   server: {
     // The app calls /api/...; in dev that's forwarded to the backend, so no CORS
     // is needed. In production put both behind one origin the same way, or set

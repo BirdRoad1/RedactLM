@@ -14,6 +14,16 @@ CORS setup is needed; point it elsewhere with `API_TARGET=http://host:port`.
 In production the API serves the built app itself (see the root README's Docker section).
 Types describing the API come from `packages/shared`.
 
+## Icons and link previews
+
+The favicons, the iOS icon and the web manifest's icons are all built from the HackUMBC 2026
+crest (`src/assets/hackumbc2026-logo.svg`): `bash scripts/build-icons.sh` regenerates them
+(needs `rsvg-convert`: `apt install librsvg2-bin`). The link-preview image, `public/og-image.png`,
+is `scripts/og-card.html` screenshotted at 1200×630.
+
+`index.html` carries `__APP_URL__` where link previews need absolute URLs; the server fills
+in `APP_URL` when it serves the page, and Vite does the same in development.
+
 ## Layout
 
 - `src/api/` – API client, types, streaming chat (`chat.ts`)

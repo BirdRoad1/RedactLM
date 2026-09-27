@@ -2,9 +2,45 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LLM Thingy</title>
+    <title>LLM Thingy: use AI without leaking what matters</title>
+    <meta name="description" content="LLM Thingy sits between your people and ChatGPT, Claude or Gemini. It catches personal data and company secrets before a message leaves, and swaps them for placeholders so the answer still helps." />
+    <meta name="application-name" content="LLM Thingy" />
+    <meta name="apple-mobile-web-app-title" content="LLM Thingy" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111522" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light dark" />
+
+    <!-- icons: the HackUMBC 2026 crest; a PNG-backed .ico for older browsers,
+         an opaque one for iOS (which fills transparency with black) -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- __APP_URL__ is this deployment's address: filled in by the server in
+         production (APP_URL), and by Vite in development -->
+    <link rel="canonical" href="__APP_URL__/" />
+
+    <!-- link previews: Discord, Slack, iMessage, LinkedIn (Open Graph) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="LLM Thingy" />
+    <meta property="og:title" content="LLM Thingy: use AI without leaking what matters" />
+    <meta property="og:description" content="Personal data and company secrets are caught before a message reaches ChatGPT, Claude or Gemini, and swapped for placeholders so the answer still helps. Self-hosted. Made at HackUMBC 2026." />
+    <meta property="og:url" content="__APP_URL__/" />
+    <meta property="og:image" content="__APP_URL__/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="LLM Thingy: a message with personal data, and what the AI receives instead: placeholders." />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X: the large image card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="LLM Thingy: use AI without leaking what matters" />
+    <meta name="twitter:description" content="Personal data and company secrets are caught before a message reaches ChatGPT, Claude or Gemini, and swapped for placeholders. Made at HackUMBC 2026." />
+    <meta name="twitter:image" content="__APP_URL__/og-image.png" />
+    <meta name="twitter:image:alt" content="LLM Thingy: a message with personal data, and what the AI receives instead: placeholders." />
   </head>
   <body>
     <div id="root"></div>

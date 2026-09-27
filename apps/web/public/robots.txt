@@ -1,0 +1,10 @@
+# Only the front page is meant for search engines; the app's own pages need
+# an account (and the server marks them noindex too).
+User-agent: *
+Allow: /$
+Disallow: /api/
+Disallow: /v1/
+Disallow: /chat
+Disallow: /admin/
+Disallow: /login
+Disallow: /sso
