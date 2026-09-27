@@ -53,10 +53,18 @@ const CATEGORIES: { name: string; events: Record<string, string> }[] = [
 
 const EVENTS: Record<string, string> = Object.assign({}, ...CATEGORIES.map((c) => c.events))
 
-const PAGE = 200
+// how many entries to load at a time: 200 unless changed, at most 2,000
+const DEFAULT_LIMIT = 200
+const MAX_LIMIT = 2000
+const toLimit = (text: string) => {
+  const n = Math.round(Number(text))
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, MAX_LIMIT) : DEFAULT_LIMIT
+}
 
-type Filters = { type: string; user: string; from: string; to: string; conversation: string }
-const noFilters: Filters = { type: '', user: '', from: '', to: '', conversation: '' }
+// `limit` is typed text; it rides along with the filters so it waits for
+// typing to pause like the user filter, but "Clear filters" leaves it
+type Filters = { type: string; user: string; from: string; to: string; conversation: string; limit: string }
+const noFilters: Filters = { type: '', user: '', from: '', to: '', conversation: '', limit: String(DEFAULT_LIMIT) }
 
 // The query string for the API. Dates are whole local days: "to" includes
 // all of that day.
@@ -67,6 +75,7 @@ function query(f: Filters) {
   else if (f.type) q.set('event', f.type)
   if (f.user.trim()) q.set('user', f.user.trim())
   if (f.conversation) q.set('conversation', f.conversation)
+  q.set('limit', String(toLimit(f.limit)))
   if (f.from) q.set('from', new Date(`${f.from}T00:00`).toISOString())
   if (f.to) {
     const end = new Date(`${f.to}T00:00`)
@@ -78,7 +87,7 @@ function query(f: Filters) {
 
 export function AuditPage() {
   const [filters, setFilters] = useState(noFilters)
-  const [applied, setApplied] = useState(noFilters) // `user` waits for typing to pause
+  const [applied, setApplied] = useState(noFilters) // `user` and `limit` wait for typing to pause
   const [entries, setEntries] = useState<AuditEntry[] | null>(null)
   const [more, setMore] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -88,9 +97,10 @@ export function AuditPage() {
   const set = (changes: Partial<Filters>) => setFilters((f) => ({ ...f, ...changes }))
 
   useEffect(() => {
-    const timer = setTimeout(() => setApplied(filters), filters.user === applied.user ? 0 : 300)
+    const typing = filters.user !== applied.user || filters.limit !== applied.limit
+    const timer = setTimeout(() => setApplied(filters), typing ? 400 : 0)
     return () => clearTimeout(timer)
-  }, [filters, applied.user])
+  }, [filters, applied.user, applied.limit])
 
   useEffect(() => {
     let cancelled = false
@@ -98,7 +108,7 @@ export function AuditPage() {
       .then((rows) => {
         if (cancelled) return
         setEntries(rows)
-        setMore(rows.length === PAGE)
+        setMore(rows.length === toLimit(applied.limit))
         setError(null)
       })
       .catch((err) => !cancelled && setError(err.message))
@@ -115,7 +125,7 @@ export function AuditPage() {
       q.set('before', String(entries[entries.length - 1]!.id))
       const rows = await api<AuditEntry[]>(`/audit-log?${q}`)
       setEntries([...entries, ...rows])
-      setMore(rows.length === PAGE)
+      setMore(rows.length === toLimit(applied.limit))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -142,7 +152,8 @@ export function AuditPage() {
     }
   }
 
-  const filtered = Object.values(filters).some(Boolean)
+  const { limit: _, ...filterValues } = filters
+  const filtered = Object.values(filterValues).some(Boolean)
 
   return (
     <section>
@@ -183,7 +194,23 @@ export function AuditPage() {
             <button aria-label="Show all conversations" onClick={() => set({ conversation: '' })}><CloseIcon size={14} /></button>
           </span>
         )}
-        {filtered && <button className="link-button" onClick={() => setFilters(noFilters)}>Clear filters</button>}
+        <label>
+          Show
+          <input
+            type="number"
+            className="limit-input"
+            min={1}
+            max={MAX_LIMIT}
+            step={50}
+            value={filters.limit}
+            aria-describedby="limit-hint"
+            onChange={(e) => set({ limit: e.target.value })}
+            // tidy up out-of-range or empty values once the field is left
+            onBlur={() => set({ limit: String(toLimit(filters.limit)) })}
+          />
+        </label>
+        <span id="limit-hint" className="small muted limit-hint">at a time, up to {MAX_LIMIT.toLocaleString()}</span>
+        {filtered && <button className="link-button" onClick={() => setFilters({ ...noFilters, limit: filters.limit })}>Clear filters</button>}
       </div>
 
       {error && <p className="error">{error}</p>}
