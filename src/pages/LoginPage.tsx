@@ -79,6 +79,13 @@ export function LoginPage() {
             </label>
             <button type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
           </form>
+          {/* without single sign-on, accounts only come from an admin */}
+          {!providers.length && (
+            <p className="login-note">
+              No account yet? Your organization's administrator creates accounts for everyone who uses LLM Thingy. Ask
+              them to add you.
+            </p>
+          )}
         </div>
       </main>
     </div>

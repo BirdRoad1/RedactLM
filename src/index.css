@@ -603,3 +603,4 @@ a.brand { color: inherit; text-decoration: none; }
 .presets button { border-radius: 999px; }
 .presets button.chosen { background: var(--fg); border-color: var(--fg); color: var(--bg); }
 .preset-hint { margin: 0; }
+.login-note { margin: 0.2rem 0 0; font-size: 0.88rem; color: var(--muted); text-align: center; }
