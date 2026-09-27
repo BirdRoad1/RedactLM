@@ -4,7 +4,7 @@ import { BlockedError, streamChat } from '../api/chat'
 import { checkFile } from '../api/check'
 import { api } from '../api/client'
 import { deleteConversation, getConversation, listConversations } from '../api/conversations'
-import hackumbcLogo from '../assets/hackumbc2026-logo.svg'
+import redactlmLogo from '../assets/redactlm-logo.png'
 import { useAuth } from '../auth/AuthContext'
 import { hasRole } from '../auth/roles'
 import type { Attachment, ChatMessage, ContentPart, ConversationSummary, FlaggedDetection, Issue, Model } from '../api/types'
@@ -402,10 +402,10 @@ export function ChatPage() {
         </div>
 
         <div className="messages">
-          {/* a new chat (not one still loading): the HackUMBC crest, centred */}
+          {/* a new chat (not one still loading): the RedactLM logo, centred */}
           {!entries.length && !id && (
             <div className="chat-empty">
-              <img src={hackumbcLogo} alt="HackUMBC 2026" className="chat-empty-logo" />
+              <img src={redactlmLogo} alt="RedactLM" className="chat-empty-logo" />
               <h2>Start a conversation</h2>
               <p className="muted">
                 {unchecked
