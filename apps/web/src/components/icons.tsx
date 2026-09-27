@@ -57,6 +57,20 @@ export const SwapIcon = ({ size }: { size?: number }) => (
   </Icon>
 )
 
+// a funnel
+export const FilterIcon = ({ size }: { size?: number }) => (
+  <Icon size={size}>
+    <path d="M4 5h16l-6 7.5V19l-4-2v-4.5z" />
+  </Icon>
+)
+
+// a speech bubble
+export const ChatIcon = ({ size }: { size?: number }) => (
+  <Icon size={size}>
+    <path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3v-3H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" />
+  </Icon>
+)
+
 export const EyeIcon = ({ size }: { size?: number }) => (
   <Icon size={size}>
     <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />

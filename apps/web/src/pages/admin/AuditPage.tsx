@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { api, apiFetch } from '../../api/client'
 import type { AuditEntry } from '../../api/types'
-import { CloseIcon } from '../../components/icons'
+import { useAuth } from '../../auth/AuthContext'
+import { hasRole } from '../../auth/roles'
+import { ChatIcon, CloseIcon, FilterIcon } from '../../components/icons'
 
 // Every kind of entry, grouped as the filter shows them, with its name here
 const CATEGORIES: { name: string; events: Record<string, string> }[] = [
@@ -86,6 +89,8 @@ function query(f: Filters) {
 }
 
 export function AuditPage() {
+  // only reviewers can open other people's chats
+  const canReview = hasRole(useAuth().user, 'review_chats')
   const [filters, setFilters] = useState(noFilters)
   const [applied, setApplied] = useState(noFilters) // `user` and `limit` wait for typing to pause
   const [entries, setEntries] = useState<AuditEntry[] | null>(null)
@@ -227,13 +232,21 @@ export function AuditPage() {
                 <td className="nowrap"><span className={`event-tag ${e.event}`}>{EVENTS[e.event] ?? e.event}</span></td>
                 <td>
                   {e.summary}
-                  {e.conversationId && !filters.conversation && (
-                    <>
-                      {' '}
-                      <button className="link-button small" onClick={() => set({ conversation: e.conversationId! })}>
-                        Everything in this chat
-                      </button>
-                    </>
+                  {e.conversationId && (
+                    <div className="entry-actions">
+                      {/* narrows this log; stays here, so it's quieter than the link */}
+                      {!filters.conversation && (
+                        <button className="link-button small entry-filter" onClick={() => set({ conversation: e.conversationId! })}>
+                          <FilterIcon size={13} /> Related entries
+                        </button>
+                      )}
+                      {/* a deleted chat is gone, so there's nothing to open */}
+                      {canReview && e.event !== 'conversation_deleted' && (
+                        <Link className="small entry-open" to={`/admin/review/${e.conversationId}`}>
+                          <ChatIcon size={13} /> Open chat
+                        </Link>
+                      )}
+                    </div>
                   )}
                 </td>
               </tr>
