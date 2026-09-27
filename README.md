@@ -3,6 +3,16 @@
 ## Purpose
 Companies like T. Rowe Price use LLMs extensively for vertification and market analysis. It's important to prevent things like PII, company secrets, and other sensitive data from going to Anthropic, OpenAI, or Google. Even if they get audited and are found to protect the data well, they should not get unnecessary PII in the first place as a matter of data security.
 
+## Run with Docker
+
+```sh
+cp .env.example .env        # set JWT_SECRET (openssl rand -base64 48) and POSTGRES_PASSWORD
+docker compose up -d --build
+docker compose exec -it api bun run create-admin you@example.com you
+```
+
+Open http://localhost:8080 and sign in. Database migrations run whenever the API starts. For a local model (e.g. Gemma) as the LLM detector, also run `docker compose --profile local-ai up -d`, pull a model with `docker compose exec ollama ollama pull gemma3`, and add the "Ollama (local)" backend with `http://ollama:11434/v1` as its URL.
+
 ## LLM Credits
 I think API has a free API.
 Must buy $10 of Claude AI credits.
@@ -13,7 +23,7 @@ Focus on OpenAI-supported.
 
 Jose & Tyler
 
-- [ ] Runs in Docker, should be very easy to setup
+- [x] Runs in Docker, should be very easy to setup
 - [ ] Support Gemini (and enter that track), Claude, ChatGPT OpenAI
 - [x] Custom LLM chat frontend, designed by Tyler, separate for proof-of-concept
 - [x] Start by recognizing PII using set rules like regex formats

@@ -4,7 +4,9 @@
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "create-admin": "bun run scripts/create-admin.ts",
-    "test": "bun test"
+    "test": "bun test",
+    "migrate": "bun run scripts/migrate.ts",
+    "start": "bun run scripts/migrate.ts && bun run src/index.ts"
   },
   "type": "module",
   "private": true,

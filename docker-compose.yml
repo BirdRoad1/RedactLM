@@ -1,0 +1,62 @@
+# LLM Thingy: Postgres, the API and the web UI.
+#
+#   cp .env.example .env     then set JWT_SECRET (and POSTGRES_PASSWORD)
+#   docker compose up -d --build
+#   docker compose exec -it api bun run create-admin you@example.com you
+#
+# Then open http://localhost:8080 (or APP_URL). Add a local model for the
+# LLM detector with:  docker compose --profile local-ai up -d
+# and the "Ollama (local)" backend preset, with http://ollama:11434/v1 as its URL.
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: llm_thingy
+      POSTGRES_USER: llm_thingy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-llm-thingy}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llm_thingy -d llm_thingy"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # not published: only the API talks to it
+
+  api:
+    build: .
+    restart: unless-stopped
+    # only what the API needs; nothing else from .env reaches it
+    environment:
+      DATABASE_URL: postgres://llm_thingy:${POSTGRES_PASSWORD:-llm-thingy}@db:5432/llm_thingy
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (e.g. openssl rand -base64 48)}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS:-28800}
+      # where people open the app; single sign-on sends them back here
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      OCR_WORKERS: ${OCR_WORKERS:-2}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./llm-thingy-web
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # Optional local model (e.g. Gemma) for the LLM detector
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["local-ai"]
+    restart: unless-stopped
+    volumes:
+      - ollama-models:/root/.ollama
+
+volumes:
+  db-data:
+  ollama-models:
