@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router'
 import type { ConversationSummary } from '../api/types'
+import { NewChatIcon, SidebarIcon } from './icons'
 
 // Today / Yesterday / Previous 7 days / Previous 30 days / Older
 function bucket(date: Date, now = new Date()) {
@@ -15,11 +16,14 @@ function bucket(date: Date, now = new Date()) {
 
 type Props = {
   conversations: ConversationSummary[]
+  collapsed: boolean // just the buttons, in a narrow strip
+  onToggle: () => void
   onNew: () => void
+  onOpen: () => void // a conversation was picked
   onDelete: (conversation: ConversationSummary) => void
 }
 
-export function ConversationList({ conversations, onNew, onDelete }: Props) {
+export function ConversationList({ conversations, collapsed, onToggle, onNew, onOpen, onDelete }: Props) {
   const groups = new Map<string, ConversationSummary[]>()
   for (const c of conversations) {
     const name = bucket(new Date(c.updatedAt))
@@ -27,16 +31,29 @@ export function ConversationList({ conversations, onNew, onDelete }: Props) {
   }
 
   return (
-    <aside className="history">
-      <button className="new-chat" onClick={onNew}>+ New chat</button>
-      {!conversations.length && <p className="muted small">Your conversations will appear here.</p>}
-      {[...groups].map(([name, items]) => (
+    <aside className={`history${collapsed ? ' collapsed' : ''}`}>
+      <div className="history-buttons">
+        <button
+          className="icon-button"
+          onClick={onToggle}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Show chats' : 'Hide chats'}
+          title={collapsed ? 'Show chats' : 'Hide chats'}
+        >
+          <SidebarIcon />
+        </button>
+        <button className="icon-button" onClick={onNew} aria-label="New chat" title="New chat">
+          <NewChatIcon />
+        </button>
+      </div>
+      {!collapsed && !conversations.length && <p className="muted small">Your conversations will appear here.</p>}
+      {!collapsed && [...groups].map(([name, items]) => (
         <div key={name}>
           <h3>{name}</h3>
           <ul>
             {items.map((c) => (
               <li key={c.id}>
-                <NavLink to={`/c/${c.id}`} title={c.title}>
+                <NavLink to={`/c/${c.id}`} title={c.title} onClick={onOpen}>
                   {c.title.replace(/\[REDACTED: ([^\]]+)\]/g, '[$1]')}
                 </NavLink>
                 <button className="delete" title="Delete conversation" aria-label="Delete conversation" onClick={() => onDelete(c)}>

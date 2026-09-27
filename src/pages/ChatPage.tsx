@@ -13,6 +13,7 @@ import { ConversationList } from '../components/ConversationList'
 import { HighlightedText } from '../components/HighlightedText'
 import { outcomeLabel } from '../components/issues'
 import { MessageContent } from '../components/MessageContent'
+import { PaperclipIcon } from '../components/icons'
 import { useLiveCheck } from '../hooks/useLiveCheck'
 
 // `stored`: loaded from history, so sensitive parts are already masked.
@@ -59,6 +60,21 @@ const readAsDataUri = (file: File) =>
     reader.readAsDataURL(file)
   })
 
+// Whether the chat list is collapsed, remembered per browser. Phones start
+// collapsed, since the open list covers the chat there.
+const SIDEBAR_KEY = 'llm-thingy.sidebar-collapsed'
+const isNarrow = () => window.matchMedia('(max-width: 700px)').matches
+
+function initiallyCollapsed() {
+  try {
+    const saved = localStorage.getItem(SIDEBAR_KEY)
+    if (saved !== null) return saved === '1'
+  } catch {
+    // storage blocked: fall back to the screen size
+  }
+  return isNarrow()
+}
+
 const asIssues = (detections: FlaggedDetection[], outcome: Issue['outcome']): Issue[] =>
   detections.map(({ start, end, title, reason, explanation, confidence }) => ({
     start, end, outcome, title, reason, explanation, confidence,
@@ -68,6 +84,17 @@ export function ChatPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
+  const [collapsed, setCollapsedState] = useState(initiallyCollapsed)
+  const setCollapsed = (value: boolean) => {
+    setCollapsedState(value)
+    try {
+      localStorage.setItem(SIDEBAR_KEY, value ? '1' : '0')
+    } catch {
+      // not remembered; fine
+    }
+  }
+  // on a phone the open list covers the chat, so get it out of the way
+  const closeIfNarrow = () => isNarrow() && setCollapsed(true)
   // set when this page started the conversation, so it isn't reloaded from the
   // server (which only has the masked text) when the URL switches to it
   const startedHere = useRef<string | null>(null)
@@ -280,7 +307,17 @@ export function ChatPage() {
 
   return (
     <div className="chat-page">
-      <ConversationList conversations={conversations} onNew={() => navigate('/')} onDelete={remove} />
+      <ConversationList
+        conversations={conversations}
+        collapsed={collapsed}
+        onToggle={() => setCollapsed(!collapsed)}
+        onNew={() => {
+          navigate('/')
+          closeIfNarrow()
+        }}
+        onOpen={closeIfNarrow}
+        onDelete={remove}
+      />
       <div className="chat">
         <div className="chat-toolbar">
           <select value={model} onChange={(e) => setModel(e.target.value)}>
@@ -303,7 +340,7 @@ export function ChatPage() {
               <div className="bubble">
                 {entry.attachments && entry.attachments.length > 0 && (
                   <span className="attachments">
-                    {entry.attachments.map((a) => <span key={a.id} className="attachment-ref">📎 {a.filename}</span>)}
+                    {entry.attachments.map((a) => <span key={a.id} className="attachment-ref"><PaperclipIcon size={13} /> {a.filename}</span>)}
                   </span>
                 )}
                 {entry.stored ? (
@@ -387,13 +424,13 @@ export function ChatPage() {
             onChange={attach}
           />
           <button type="button" className="attach" title="Attach PDFs, images or text files" aria-label="Attach files" onClick={() => fileInput.current?.click()}>
-            📎
+            <PaperclipIcon />
           </button>
           <CheckedTextarea
             value={draft}
             issues={liveIssues}
             placeholder="Message"
-            rows={3}
+            rows={1}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key !== 'Enter' || e.shiftKey) return

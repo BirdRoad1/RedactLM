@@ -47,3 +47,31 @@ export function likelihood(confidence: number) {
   if (confidence >= 0.5) return 'Likely'
   return 'Possible'
 }
+
+// Moves issues found in `before` onto `after`, so highlights stay on the same
+// characters while the text is being edited. The edit is whatever lies
+// between the common start and common end of the two texts: issues before it
+// stay put, ones after it shift by the change in length, and ones it touches
+// stretch or shrink with it. Issues whose text was deleted entirely go.
+export function shiftIssues(issues: Issue[], before: string, after: string): Issue[] {
+  if (before === after || !issues.length) return issues
+  let prefix = 0
+  const shortest = Math.min(before.length, after.length)
+  while (prefix < shortest && before[prefix] === after[prefix]) prefix++
+  let suffix = 0
+  while (suffix < shortest - prefix && before[before.length - 1 - suffix] === after[after.length - 1 - suffix]) suffix++
+
+  const oldEnd = before.length - suffix // the edit replaced before[prefix, oldEnd)
+  const newEnd = after.length - suffix // with after[prefix, newEnd)
+  const delta = after.length - before.length
+  // Typing right against a highlight doesn't join it: a start at the edit
+  // moves with what follows, an end at the edit stays with what precedes.
+  // Anything inside the edit goes to the edge of what replaced it.
+  const shift = (at: number) => at + delta
+
+  return issues.flatMap((issue) => {
+    const start = issue.start >= oldEnd ? shift(issue.start) : Math.min(issue.start, prefix)
+    const end = issue.end <= prefix ? issue.end : issue.end >= oldEnd ? shift(issue.end) : newEnd
+    return end > start ? [{ ...issue, start, end }] : []
+  })
+}

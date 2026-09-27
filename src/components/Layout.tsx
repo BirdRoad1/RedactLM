@@ -8,7 +8,7 @@ export function Layout() {
   return (
     <div className="layout">
       <header className="topbar">
-        <strong>LLM Thingy</strong>
+        <span className="brand">LLM Thingy</span>
         <nav>
           <NavLink to="/" end>Chat</NavLink>
           {hasRole(user, 'review_chats') && <NavLink to="/admin/review">Review chats</NavLink>}

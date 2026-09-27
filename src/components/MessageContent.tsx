@@ -1,3 +1,5 @@
+import { PaperclipIcon } from './icons'
+
 // Message text as stored, where sensitive parts were masked as
 // "[REDACTED: Phone number]" and attachments noted as "[Attached: a.pdf]";
 // both are shown as small labels
@@ -10,7 +12,7 @@ export function MessageContent({ text }: { text: string }) {
     parts.push(text.slice(cursor, match.index))
     parts.push(
       match[1] === 'Attached' ? (
-        <span key={match.index} className="attachment-ref" title="Attachments aren't kept in history">📎 {match[2]}</span>
+        <span key={match.index} className="attachment-ref" title="Attachments aren't kept in history"><PaperclipIcon size={13} /> {match[2]}</span>
       ) : (
         <span key={match.index} className="masked" title="Removed before saving because it was sensitive">
           {match[2]} removed
