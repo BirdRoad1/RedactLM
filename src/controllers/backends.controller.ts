@@ -3,6 +3,7 @@ import {
   backendIdSchema,
   createBackendSchema,
 } from "../schema/backends.schema";
+import { audit } from "../services/audit.service";
 import * as backendsService from "../services/backends.service";
 import type { Backend } from "../services/backends.service";
 
@@ -22,7 +23,9 @@ export async function createBackend(c: Context) {
   }
 
   try {
-    return c.json(publicBackend(await backendsService.createBackend(parsed.data)), 201);
+    const backend = await backendsService.createBackend(parsed.data);
+    await audit("backend_created", { name: backend.name, slug: backend.slug, trust: backend.trust });
+    return c.json(publicBackend(backend), 201);
   } catch (err) {
     if (err instanceof backendsService.BackendSlugTakenError) {
       return c.json({ error: err.message }, 409);
@@ -42,5 +45,6 @@ export async function deleteBackend(c: Context) {
     return c.json({ error: "Backend not found" }, 404);
   }
 
+  await audit("backend_deleted", { name: deleted.name, slug: deleted.slug });
   return c.json(publicBackend(deleted));
 }

@@ -1,5 +1,6 @@
 import { swaggerUI } from "@hono/swagger-ui";
 import { Hono } from "hono";
+import { contextStorage } from "hono/context-storage";
 import { openApiDoc } from "./docs/openapi";
 import { env } from "./env/env";
 import { logRequests } from "./middleware/logger";
@@ -15,6 +16,8 @@ import { settingsRoutes } from "./routes/settings.routes";
 
 const app = new Hono();
 
+// lets code deep in a request (audit logging) see who made it
+app.use(contextStorage());
 app.use(logRequests);
 
 app.get("/", (c) => c.text("OK"));

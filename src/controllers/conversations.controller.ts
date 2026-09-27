@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import type { AuthEnv } from "../middleware/auth";
+import { audit } from "../services/audit.service";
 import * as conversationsService from "../services/conversations.service";
 
 export async function listConversations(c: Context<AuthEnv>) {
@@ -13,5 +14,7 @@ export async function getConversation(c: Context<AuthEnv>) {
 
 export async function deleteConversation(c: Context<AuthEnv>) {
   const deleted = await conversationsService.deleteConversation(c.get("userId"), c.req.param("id")!);
-  return deleted ? c.body(null, 204) : c.json({ error: "Conversation not found" }, 404);
+  if (!deleted) return c.json({ error: "Conversation not found" }, 404);
+  await audit("conversation_deleted", { title: deleted.title });
+  return c.body(null, 204);
 }

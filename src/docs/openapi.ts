@@ -224,8 +224,10 @@ export const openApiDoc = {
       get: {
         tags: ["Audit"],
         summary: "Latest audit log entries (admins)",
-        description: "Newest first, at most 200. `summary` describes each entry in plain language; entries never contain the checked text.",
+        description:
+          "Newest first, at most 200. `summary` describes each entry in plain language; entries never contain checked text, passwords or API keys. Events: message_blocked, message_warned, message_replaced, partially_checked, attachment_refused, detector_unavailable, conversation_deleted, settings_changed, backend_created, backend_deleted, user_created, login_succeeded, login_failed.",
         security: bearer,
+        parameters: [{ name: "event", in: "query", required: false, description: "Only this kind of entry", schema: { type: "string" } }],
         responses: {
           ...adminOnly,
           200: {

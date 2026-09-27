@@ -4,4 +4,4 @@ import { listAudit } from "../services/audit.service";
 
 export const auditRoutes = new Hono<AuthEnv>()
   .use(requireAdmin)
-  .get("/", async (c) => c.json(await listAudit()));
+  .get("/", async (c) => c.json(await listAudit({ event: c.req.query("event") || undefined })));

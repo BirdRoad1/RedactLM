@@ -128,8 +128,10 @@ export async function getConversation(userId: number, id: string) {
   };
 }
 
+// The deleted conversation, or undefined if it wasn't the user's
 export async function deleteConversation(userId: number, id: string) {
-  if (!(await getOwnedConversation(userId, id))) return false;
+  const convo = await getOwnedConversation(userId, id);
+  if (!convo) return undefined;
   await db.delete(conversationsTable).where(eq(conversationsTable.id, id));
-  return true;
+  return convo;
 }

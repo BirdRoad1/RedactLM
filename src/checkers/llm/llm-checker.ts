@@ -7,6 +7,7 @@ import {
   getLlmDetectorConfig,
   type LlmDetectorConfig,
 } from "../../services/llm-detector.service";
+import { audit } from "../../services/audit.service";
 import { upstreamJson } from "../../services/upstream.service";
 import { DetectionType, type Detection, type IssueWording } from "../checker";
 
@@ -215,6 +216,7 @@ export async function runLlmChecks(text: string, signal?: AbortSignal): Promise<
 
   const unavailable = (reason: string) => {
     console.error(`LLM detector unavailable (${config.failMode}): ${reason}`);
+    void audit("detector_unavailable", { failMode: config.failMode, reason });
     if (config.failMode === "allow") return [];
     throw new LlmDetectorUnavailableError("The PII detector is unavailable, so the request was blocked");
   };

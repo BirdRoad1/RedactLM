@@ -143,6 +143,7 @@ export async function createCompletion(c: Context<AuthEnv>) {
       return c.json(apiError(err.message, "detector_unavailable"), 503);
     }
     if (err instanceof UnsupportedAttachmentError) {
+      await audit("attachment_refused", { reason: err.message }, { conversationId: continuing ?? null });
       return c.json(apiError(err.message, "attachment_unsupported"), 400);
     }
     throw err;
@@ -171,6 +172,24 @@ export async function createCompletion(c: Context<AuthEnv>) {
   await touchConversation(convo);
   c.header("X-Conversation-Id", convo);
 
+  // What was found in the newly sent messages (history was logged when it was
+  // new). A blocked message is logged for what blocked it and nothing else.
+  const blockedAny = scans.some((s) => s?.outcome === "blocked");
+  for (const [i, scan] of scans.entries()) {
+    if (i < firstToSave || !scan) continue;
+    const findings = (outcome: Outcome) =>
+      scan.scored
+        .filter((s) => s.outcome === outcome)
+        .map(({ detection: d, source }) => ({ title: d.title, checker: d.checker, source }));
+    const events = blockedAny
+      ? ([["message_blocked", "blocked"]] as const)
+      : ([["message_replaced", "redacted"], ["message_warned", "warned"]] as const);
+    for (const [event, outcome] of events) {
+      const found = findings(outcome);
+      if (found.length) await audit(event, { messageIndex: i, findings: found }, { conversationId: convo });
+    }
+  }
+
 
   const blocked = flagged(scans, "blocked");
   if (blocked.length) {
@@ -195,7 +214,7 @@ export async function createCompletion(c: Context<AuthEnv>) {
     i >= firstToSave ? (scans[i]?.partial ?? []).map((p) => ({ messageIndex: i, ...p })) : [],
   );
   for (const details of partial) {
-    await audit({ event: "partially_checked", userId, conversationId: convo, details });
+    await audit("partially_checked", details, { conversationId: convo });
   }
 
   // Warnings don't stop the request; clients that care (our web UI) read this header

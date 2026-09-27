@@ -5,6 +5,7 @@ import {
   updateDefaultsSchema,
 } from "../schema/detection-policy.schema";
 import { updateLlmDetectorSchema } from "../schema/llm-detector.schema";
+import { audit, type AuditEvents } from "../services/audit.service";
 import * as detectionPolicyService from "../services/detection-policy.service";
 import * as llmDetectorService from "../services/llm-detector.service";
 
@@ -19,7 +20,9 @@ export async function updateLlmDetector(c: Context) {
   }
 
   try {
-    return c.json(await llmDetectorService.updateLlmDetectorConfig(parsed.data));
+    const updated = await llmDetectorService.updateLlmDetectorConfig(parsed.data);
+    await audit("settings_changed", { setting: "the LLM detector settings", changes: parsed.data });
+    return c.json(updated);
   } catch (err) {
     if (err instanceof llmDetectorService.InvalidDetectorConfigError) {
       return c.json({ error: err.message }, 400);
@@ -37,7 +40,10 @@ export async function updateDetectionDefaults(c: Context) {
   if (parsed.error) {
     return invalid(c, parsed.error);
   }
-  return policyResponse(c, () => detectionPolicyService.updateDefaults(parsed.data));
+  return policyResponse(c, () => detectionPolicyService.updateDefaults(parsed.data), {
+    setting: "the detection policy defaults",
+    changes: parsed.data,
+  });
 }
 
 export async function setCheckerPolicy(c: Context) {
@@ -45,20 +51,26 @@ export async function setCheckerPolicy(c: Context) {
   if (parsed.error) {
     return invalid(c, parsed.error);
   }
-  return policyResponse(c, () =>
-    detectionPolicyService.setCheckerOverride(c.req.param("checker")!, parsed.data),
-  );
+  const checker = c.req.param("checker")!;
+  return policyResponse(c, () => detectionPolicyService.setCheckerOverride(checker, parsed.data), {
+    setting: `the thresholds for "${checker}"`,
+    changes: parsed.data,
+  });
 }
 
 export async function deleteCheckerPolicy(c: Context) {
-  return policyResponse(c, () =>
-    detectionPolicyService.deleteCheckerOverride(c.req.param("checker")!),
-  );
+  const checker = c.req.param("checker")!;
+  return policyResponse(c, () => detectionPolicyService.deleteCheckerOverride(checker), {
+    setting: `the thresholds for "${checker}"`,
+    changes: { override: "removed, back to the defaults" },
+  });
 }
 
-async function policyResponse(c: Context, run: () => Promise<unknown>) {
+async function policyResponse(c: Context, run: () => Promise<unknown>, change: AuditEvents["settings_changed"]) {
   try {
-    return c.json(await run());
+    const result = await run();
+    await audit("settings_changed", change);
+    return c.json(result);
   } catch (err) {
     if (err instanceof detectionPolicyService.InvalidPolicyError) {
       return c.json({ error: err.message }, 400);
