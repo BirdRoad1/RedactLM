@@ -1,0 +1,1 @@
+ALTER TABLE "message_detections" ADD COLUMN "location" text;

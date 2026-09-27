@@ -17,4 +17,14 @@ export const issueSchema = z.object({
 
 export const checkResponseSchema = z.object({ issues: z.array(issueSchema) });
 
+export const checkFileRequestSchema = z.object({
+  filename: z.string().min(1).max(255),
+  data: z.string().startsWith("data:"), // data URI, as in a chat message's file part
+});
+
+export const checkFileResponseSchema = z.object({
+  pages: z.number().int().nullable(), // PDFs only
+  issues: z.array(issueSchema.extend({ page: z.number().int().nullable() })),
+});
+
 export type Issue = z.infer<typeof issueSchema>;

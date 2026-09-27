@@ -116,7 +116,8 @@ export const messageDetectionsTable = pgTable("message_detections", {
     checker: varchar({ length: 64 }).notNull(),
     userFacingReason: text("user_facing_reason").notNull(),
     confidence: real().notNull(),
-    start: integer().notNull(),      // position in the original text, before masking
+    location: text(),                // attachment it was found in, e.g. "report.pdf, page 2"; null = message text
+    start: integer().notNull(),      // position in the original text (or the attachment's page), before masking
     end: integer().notNull(),
     outcome: outcomeEnum().notNull(),
 }, (t) => [

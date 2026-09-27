@@ -7,7 +7,7 @@ import {
   messageDetectionsTable,
   messagesTable,
 } from "../db/schema";
-import type { ScoredDetection } from "./scan.service";
+import { describeSource, type ScoredDetection } from "./scan.service";
 
 export async function createConversation(
   userId: number,
@@ -22,14 +22,15 @@ export async function createConversation(
 }
 
 // Saves a message with every detected span masked, plus what was detected
-// (never the detected text itself)
+// (never the detected text itself). Attachments aren't stored, only their names.
 export async function saveMessage(
   message: typeof messagesTable.$inferInsert,
   scored: ScoredDetection[] = [],
+  attachmentNames: string[] = [],
 ) {
-  const detections = scored.map((s) => s.detection);
-  const content =
-    message.content && detections.length ? redact(message.content, detections) : message.content;
+  const inText = scored.filter((s) => !s.source).map((s) => s.detection);
+  const masked = message.content && inText.length ? redact(message.content, inText) : message.content;
+  const content = [masked, ...attachmentNames.map((name) => `[Attached: ${name}]`)].filter(Boolean).join("\n\n") || masked;
 
   await db.transaction(async (tx) => {
     const [row] = await tx
@@ -39,9 +40,10 @@ export async function saveMessage(
 
     if (scored.length) {
       await tx.insert(messageDetectionsTable).values(
-        scored.map(({ detection: d, outcome }) => ({
+        scored.map(({ detection: d, outcome, source }) => ({
           messageId: row!.id,
           checker: d.checker,
+          location: source ? describeSource(source) : null,
           userFacingReason: d.userFacingReason,
           confidence: d.confidence,
           start: d.start,

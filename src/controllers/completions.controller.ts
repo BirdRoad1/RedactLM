@@ -23,7 +23,15 @@ import {
   touchConversation,
 } from "../services/conversations.service";
 import { getPolicy } from "../services/detection-policy.service";
-import { scanStatic, scanText, type Scan } from "../services/scan.service";
+import { UnsupportedAttachmentError } from "../files/extract";
+import {
+  prepareMessage,
+  scanMessage,
+  scanStatic,
+  type PreparedMessage,
+  type Scan,
+  type Source,
+} from "../services/scan.service";
 import {
   UpstreamError,
   upstreamErrorResponse,
@@ -34,6 +42,10 @@ import {
 function apiError(message: string, type: string) {
   return { error: { message, type } } satisfies CompletionErrorResponse;
 }
+
+// Headers must be ASCII; filenames needn't be. \u escapes keep it valid JSON.
+const asciiJson = (value: unknown) =>
+  JSON.stringify(value).replace(/[\u007f-\uffff]/g, (ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`);
 
 const actionFor = {
   ignored: "allowed",
@@ -49,16 +61,18 @@ type FlaggedDetection = {
   reason: string;
   explanation: string;
   confidence: number;
-  start: number;
+  start: number; // in the message text, or in `source`'s page when set
   end: number;
+  source?: Source; // found in this attachment
 };
 
 function flagged(scans: (Scan | undefined)[], outcome: Outcome): FlaggedDetection[] {
   return scans.flatMap((scan, messageIndex) =>
     (scan?.scored ?? [])
       .filter((s) => s.outcome === outcome)
-      .map(({ detection: d }) => ({
+      .map(({ detection: d, source }) => ({
         messageIndex,
+        source,
         checker: d.checker,
         title: d.title,
         reason: d.userFacingReason,
@@ -106,30 +120,27 @@ export async function createCompletion(c: Context<AuthEnv>) {
     return c.json(apiError("Conversation not found", "conversation_not_found"), 404);
   }
 
-  // Validate everything before any detector calls or DB writes
-  // TODO: support content given as an array of parts
-  const messages = [];
-  for (const message of json.messages) {
-    if (typeof message.content !== "string") {
-      return c.text("Unsupported content", 400);
-    }
-    messages.push({ ...message, content: message.content });
-  }
-
+  // Validate everything before any detector calls or DB writes, then check
+  // user messages: their text and everything their attachments show
   // TODO: scan non-user messages and tool calls too
   const policy = await getPolicy();
+  let messages: PreparedMessage[];
   let scans: (Scan | undefined)[];
   try {
+    messages = json.messages.map(prepareMessage);
     scans = await Promise.all(
       messages.map((message) =>
         message.role === "user"
-          ? scanText(message.content, policy, c.req.raw.signal)
+          ? scanMessage(message, policy, c.req.raw.signal)
           : undefined,
       ),
     );
   } catch (err) {
     if (err instanceof LlmDetectorUnavailableError) {
       return c.json(apiError(err.message, "detector_unavailable"), 503);
+    }
+    if (err instanceof UnsupportedAttachmentError) {
+      return c.json(apiError(err.message, "attachment_unsupported"), 400);
     }
     throw err;
   }
@@ -149,6 +160,7 @@ export async function createCompletion(c: Context<AuthEnv>) {
         model: json.model,
       },
       scans[i]?.scored,
+      message.attachments.map((a) => a.filename),
     );
   }
   await touchConversation(convo);
@@ -156,7 +168,9 @@ export async function createCompletion(c: Context<AuthEnv>) {
 
   const blocked = flagged(scans, "blocked");
   if (blocked.length) {
-    const reasons = [...new Set(blocked.map((d) => d.reason))];
+    const reasons = [...new Set(blocked.map((d) =>
+      d.source ? `${d.title} in "${d.source.filename}"${d.source.page ? `, page ${d.source.page}` : ""}` : d.reason,
+    ))];
     return c.json(
       {
         error: {
@@ -172,7 +186,7 @@ export async function createCompletion(c: Context<AuthEnv>) {
   // Warnings don't stop the request; clients that care (our web UI) read this header
   const warnings = flagged(scans, "warned");
   const warningHeaders: Record<string, string> = warnings.length
-    ? { "X-PII-Warnings": JSON.stringify(warnings) }
+    ? { "X-PII-Warnings": asciiJson(warnings) }
     : {};
   for (const [name, value] of Object.entries(warningHeaders)) c.header(name, value);
 

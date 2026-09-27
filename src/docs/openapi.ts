@@ -9,7 +9,12 @@ import {
 import { completionsRequest } from "../schema/completions-request.schema";
 import { modelsList } from "../schema/models-request.schema";
 import { thresholdsSchema, updateDefaultsSchema } from "../schema/detection-policy.schema";
-import { checkRequestSchema, checkResponseSchema } from "../schema/check.schema";
+import {
+  checkFileRequestSchema,
+  checkFileResponseSchema,
+  checkRequestSchema,
+  checkResponseSchema,
+} from "../schema/check.schema";
 import { updateLlmDetectorSchema } from "../schema/llm-detector.schema";
 import { createUserSchema } from "../schema/user.schema";
 
@@ -190,6 +195,29 @@ export const openApiDoc = {
         responses: { ...unauthorized, 204: { description: "Deleted" }, 404: { description: "Not found, or not yours" } },
       },
     },
+    "/check/file": {
+      post: {
+        tags: ["Checks"],
+        summary: "Check an attachment before sending it",
+        description:
+          "Reads the file locally (OCR for images and each PDF page, ignoring any text layer inside the PDF; plain-text files as-is) and runs the static checks. No AI model is involved and nothing is stored. Up to 20 MB and 50 pages. Sending re-checks everything, including with the LLM detector.",
+        security: bearer,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: z.toJSONSchema(checkFileRequestSchema, { io: "input" }),
+              example: { filename: "intake.pdf", data: "data:application/pdf;base64,JVBERi0..." },
+            },
+          },
+        },
+        responses: {
+          ...unauthorized,
+          200: { description: "Issues found, with the page they're on", content: json(checkFileResponseSchema) },
+          400: error("Unsupported, too large, unreadable or too many pages; the message says which"),
+        },
+      },
+    },
     "/v1/chat/completions": {
       post: {
         tags: ["OpenAI-compatible"],
@@ -204,7 +232,7 @@ export const openApiDoc = {
           },
         ],
         description:
-          '`model` is `"<backend slug>/<model>"`, or a bare `"<model>"` for the default backend. With `stream: true` the response is Server-Sent Events of completion chunks, ending in `data: [DONE]`.\n\nUser messages are checked against the detection policy (`/settings/detection-policy`): detections at or above `blockAt` reject the request, those at or above `warnAt` let it through and are listed in the `X-PII-Warnings` header. Stored messages have every detected span masked.',
+          '`model` is `"<backend slug>/<model>"`, or a bare `"<model>"` for the default backend. User messages may carry attachments as `file` parts with `file_data` (PDF, image or plain text, up to 20 MB / 50 pages) or `image_url` parts with a `data:` URL; they are read locally with OCR and checked like text. Linked images, file ids and other file types are refused, since they cannot be checked. With `stream: true` the response is Server-Sent Events of completion chunks, ending in `data: [DONE]`.\n\nUser messages are checked against the detection policy (`/settings/detection-policy`): detections at or above `blockAt` reject the request, those at or above `warnAt` let it through and are listed in the `X-PII-Warnings` header. Stored messages have every detected span masked.',
         security: bearer,
         requestBody: {
           required: true,

@@ -1,5 +1,6 @@
 import type { Context } from "hono";
-import { checkRequestSchema, type Issue } from "../schema/check.schema";
+import { attachmentFromPart, extractText, UnsupportedAttachmentError } from "../files/extract";
+import { checkFileRequestSchema, checkRequestSchema, type Issue } from "../schema/check.schema";
 import { getPolicy } from "../services/detection-policy.service";
 import { scanStatic } from "../services/scan.service";
 
@@ -11,8 +12,11 @@ export async function checkText(c: Context) {
     return c.json({ error: "Send {\"text\": \"...\"} of at most 100,000 characters" }, 400);
   }
 
-  const { scored } = scanStatic(parsed.data.text, await getPolicy());
-  const issues: Issue[] = scored.flatMap(({ detection: d, outcome }) =>
+  return c.json({ issues: issuesIn(parsed.data.text, await getPolicy()) });
+}
+
+function issuesIn(text: string, policy: Awaited<ReturnType<typeof getPolicy>>): Issue[] {
+  return scanStatic(text, policy).scored.flatMap(({ detection: d, outcome }) =>
     outcome === "ignored"
       ? []
       : [{
@@ -25,6 +29,30 @@ export async function checkText(c: Context) {
           confidence: d.confidence,
         }],
   );
+}
 
-  return c.json({ issues });
+// Checks an attachment when it's attached. Reading it is local (OCR for
+// images and PDF pages, never an AI model); the checks are the static ones.
+// Sending re-checks with everything, the LLM detector included.
+export async function checkFile(c: Context) {
+  const parsed = await checkFileRequestSchema.safeParseAsync(await c.req.json());
+  if (parsed.error) {
+    return c.json({ error: "Send {\"filename\": \"...\", \"data\": \"data:...;base64,...\"}" }, 400);
+  }
+
+  try {
+    const attachment = attachmentFromPart(
+      { type: "file", file: { filename: parsed.data.filename, file_data: parsed.data.data } },
+      1,
+    );
+    const pages = await extractText(attachment);
+    const policy = await getPolicy();
+    return c.json({
+      pages: attachment.kind === "pdf" ? pages.length : null,
+      issues: pages.flatMap((p) => issuesIn(p.text, policy).map((issue) => ({ ...issue, page: p.page ?? null }))),
+    });
+  } catch (err) {
+    if (err instanceof UnsupportedAttachmentError) return c.json({ error: err.message }, 400);
+    throw err;
+  }
 }
