@@ -25,7 +25,7 @@ export function Layout() {
   return (
     <div className="layout">
       <header className="topbar" ref={header}>
-        <Link to="/" className="brand">LLM Thingy</Link>
+        <Link to="/chat" className="brand">LLM Thingy</Link>
         <button
           type="button"
           className="icon-button menu-toggle"
