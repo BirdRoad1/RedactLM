@@ -1,6 +1,6 @@
 import type { Detection } from "../checkers/checker";
 import { runLlmChecks } from "../checkers/llm/llm-checker";
-import { outcomeFor, worstOutcome, type Outcome, type Policy } from "../checkers/policy";
+import { mergeSpans, outcomeFor, worstOutcome, type Outcome, type Policy } from "../checkers/policy";
 import { runStaticChecks } from "../checkers/run-static-checks";
 import {
   attachmentFromPart,
@@ -23,28 +23,52 @@ export type ScoredDetection = { detection: Detection; outcome: Outcome; source?:
 // of it, the detector only the first `checkedChars`
 export type PartialCheck = { source?: Source; checkedChars: number; totalChars: number };
 
-export type Scan = { scored: ScoredDetection[]; outcome: Outcome; partial?: PartialCheck[] };
+// Something to swap for a placeholder before sending: the exact text found,
+// where (in the message text, or in a text attachment), and what it is
+export type Replacement = { value: string; start: number; end: number; title: string; source?: Source };
 
-const score = (detections: Detection[], policy: Policy) =>
-  detections.map((detection) => ({ detection, outcome: outcomeFor(detection, policy) }));
+export type Scan = {
+  scored: ScoredDetection[];
+  outcome: Outcome;
+  partial?: PartialCheck[];
+  replacements?: Replacement[];
+};
+
+const score = (detections: Detection[], policy: Policy, editable = false) =>
+  detections.map((detection) => ({ detection, outcome: outcomeFor(detection, policy, editable) }));
+
+// The spans of `text` that are to be replaced, overlapping ones merged
+function replacementsIn(text: string, scored: ScoredDetection[], source?: Source): Replacement[] {
+  const spans = scored
+    .filter((s) => s.outcome === "redacted")
+    .map((s) => ({ start: s.detection.start, end: s.detection.end, title: s.detection.title }));
+  return mergeSpans(spans).map(({ start, end, first }) => ({
+    value: text.slice(start, end),
+    start,
+    end,
+    title: first.title,
+    source,
+  }));
+}
 
 // Static checks over all of `text`, then the LLM detector over its first
 // `llmChars` characters, unless the static checks already block (it's slow,
-// and the answer can't get any worse). Throws LlmDetectorUnavailableError
-// when the detector fails closed.
-export async function scanText(text: string, policy: Policy, signal?: AbortSignal, llmChars = Infinity): Promise<Scan> {
-  const scored = score(runStaticChecks(text), policy);
+// and the answer can't get any worse). `editable`: the text can be changed
+// before sending, so in replace mode blocks become replacements. Throws
+// LlmDetectorUnavailableError when the detector fails closed.
+export async function scanText(text: string, policy: Policy, signal?: AbortSignal, llmChars = Infinity, editable = false): Promise<Scan> {
+  const scored = score(runStaticChecks(text), policy, editable);
 
   if (llmChars > 0 && worstOutcome(scored.map((s) => s.outcome)) !== "blocked") {
-    scored.push(...score(await runLlmChecks(text.slice(0, llmChars), signal), policy));
+    scored.push(...score(await runLlmChecks(text.slice(0, llmChars), signal), policy, editable));
   }
 
   return { scored, outcome: worstOutcome(scored.map((s) => s.outcome)) };
 }
 
 // Static checks only, for text we store but don't gate on (assistant replies)
-export function scanStatic(text: string, policy: Policy): Scan {
-  const scored = score(runStaticChecks(text), policy);
+export function scanStatic(text: string, policy: Policy, editable = false): Scan {
+  const scored = score(runStaticChecks(text), policy, editable);
   return { scored, outcome: worstOutcome(scored.map((s) => s.outcome)) };
 }
 
@@ -79,7 +103,7 @@ export async function scanMessage(message: PreparedMessage, policy: Policy, sign
   }
 
   const scans = await Promise.all([
-    scanText(message.content, policy, signal, limit),
+    scanText(message.content, policy, signal, limit, true),
     ...message.attachments.map(async (attachment) => {
       const pages = await extractText(attachment);
 
@@ -97,14 +121,26 @@ export async function scanMessage(message: PreparedMessage, policy: Policy, sign
         partial.push({ source: { filename: attachment.filename }, checkedChars: limit, totalChars: longest });
       }
 
-      const pageScans = await Promise.all(pages.map((p, i) => scanText(p.text, policy, signal, budgets[i])));
-      return pageScans.flatMap((scan, i) =>
+      // only plain-text files can be edited cleanly; PDFs and images block as before
+      const editable = attachment.kind === "text";
+      const pageScans = await Promise.all(pages.map((p, i) => scanText(p.text, policy, signal, budgets[i], editable)));
+      const scored = pageScans.flatMap((scan, i) =>
         scan.scored.map((s) => ({ ...s, source: { filename: attachment.filename, page: pages[i]!.page } })),
       );
+      const replacements = editable
+        ? replacementsIn(pages[0]?.text ?? "", pageScans[0]?.scored ?? [], { filename: attachment.filename })
+        : [];
+      return { scored, replacements };
     }),
   ]);
 
-  const [text, ...files] = scans;
-  const scored = [...(text as Scan).scored, ...(files as ScoredDetection[][]).flat()];
-  return { scored, outcome: worstOutcome(scored.map((s) => s.outcome)), partial: partial.length ? partial : undefined };
+  const [text, ...files] = scans as [Scan, ...{ scored: ScoredDetection[]; replacements: Replacement[] }[]];
+  const scored = [...text.scored, ...files.flatMap((f) => f.scored)];
+  const replacements = [...replacementsIn(message.content, text.scored), ...files.flatMap((f) => f.replacements)];
+  return {
+    scored,
+    outcome: worstOutcome(scored.map((s) => s.outcome)),
+    partial: partial.length ? partial : undefined,
+    replacements: replacements.length ? replacements : undefined,
+  };
 }

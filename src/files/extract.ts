@@ -42,6 +42,15 @@ function describeType(mime: string, filename: string) {
   return ext ? `a .${ext.toLowerCase()} file` : "this kind of file";
 }
 
+const isTextType = (mime: string) => mime.startsWith("text/") || TEXT_TYPES.includes(mime);
+
+// Edits the contents of a plain-text data URI; other kinds come back unchanged
+export function rewriteTextDataUri(uri: string, edit: (text: string) => string) {
+  const parsed = parseDataUri(uri);
+  if (!parsed || !isTextType(parsed.mime)) return uri;
+  return `data:${parsed.mime};base64,${Buffer.from(edit(parsed.bytes.toString("utf8"))).toString("base64")}`;
+}
+
 function parseDataUri(uri: string) {
   const match = /^data:([^;,]+)?((?:;[^;,]+)*?);base64,(.*)$/s.exec(uri);
   if (!match) return undefined;
@@ -82,7 +91,7 @@ export function attachmentFromPart(
   const { mime, bytes } = parsed;
   if (mime === "application/pdf") return { kind: "pdf", filename, bytes };
   if (IMAGE_TYPES.includes(mime)) return { kind: "image", filename, bytes };
-  if (mime.startsWith("text/") || TEXT_TYPES.includes(mime)) return { kind: "text", filename, bytes };
+  if (isTextType(mime)) return { kind: "text", filename, bytes };
   throw new UnsupportedAttachmentError(
     `"${filename}" can't be checked because it's ${describeType(mime, filename)}. PDFs, images and plain-text files can be sent.`,
   );

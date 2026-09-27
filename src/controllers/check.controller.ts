@@ -13,11 +13,12 @@ export async function checkText(c: Context) {
     return c.json({ error: "Send {\"text\": \"...\"} of at most 100,000 characters" }, 400);
   }
 
-  return c.json({ issues: issuesIn(parsed.data.text, await getPolicy()) });
+  return c.json({ issues: issuesIn(parsed.data.text, await getPolicy(), true) });
 }
 
-function issuesIn(text: string, policy: Awaited<ReturnType<typeof getPolicy>>): Issue[] {
-  return scanStatic(text, policy).scored.flatMap(({ detection: d, outcome }) =>
+// `editable`: in replace mode, what would block gets replaced instead
+function issuesIn(text: string, policy: Awaited<ReturnType<typeof getPolicy>>, editable: boolean): Issue[] {
+  return scanStatic(text, policy, editable).scored.flatMap(({ detection: d, outcome }) =>
     outcome === "ignored"
       ? []
       : [{
@@ -60,7 +61,7 @@ export async function checkFile(c: Context) {
     return c.json({
       pages: attachment.kind === "pdf" ? new Set(pages.map((p) => p.page)).size : null,
       partial,
-      issues: pages.flatMap((p) => issuesIn(p.text, policy).map((issue) => ({ ...issue, page: p.page ?? null }))),
+      issues: pages.flatMap((p) => issuesIn(p.text, policy, attachment.kind === "text").map((issue) => ({ ...issue, page: p.page ?? null }))),
     });
   } catch (err) {
     if (err instanceof UnsupportedAttachmentError) return c.json({ error: err.message }, 400);

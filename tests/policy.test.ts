@@ -17,6 +17,7 @@ const detection = (checker: string, confidence: number, start = 0, end = 1, titl
 
 describe("outcomeFor", () => {
   const policy: Policy = {
+    mode: "block",
     defaults: { warnAt: 0.3, blockAt: 0.8 },
     checkers: {
       phone: { warnAt: 0.5, blockAt: null }, // warn only

@@ -12,11 +12,12 @@ import { describeSource, type ScoredDetection } from "./scan.service";
 export async function createConversation(
   userId: number,
   client: string | null,
+  id?: string,
 ) {
   return (
     await db
       .insert(conversationsTable)
-      .values({ userId, client })
+      .values({ id, userId, client })
       .returning()
   )[0]!.id;
 }

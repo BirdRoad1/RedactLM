@@ -15,22 +15,24 @@ export class InvalidPolicyError extends Error {}
 
 // Secure out of the box: every current detector scores 0.5+, so all block
 const DEFAULTS: Thresholds = { warnAt: 0.3, blockAt: 0.5 };
+const DEFAULT_MODE: Policy["mode"] = "block";
 
 export function knownCheckers() {
   return [...staticCheckerNames, LLM_CHECKER];
 }
 
-async function getDefaults(): Promise<Thresholds> {
+async function getDefaults(): Promise<Thresholds & { mode: Policy["mode"] }> {
   const [row] = await db.select().from(detectionPolicyTable).where(eq(detectionPolicyTable.id, 1));
-  return row ? { warnAt: row.warnAt, blockAt: row.blockAt } : DEFAULTS;
+  return row ? { warnAt: row.warnAt, blockAt: row.blockAt, mode: row.mode } : { ...DEFAULTS, mode: DEFAULT_MODE };
 }
 
 export async function getPolicy(): Promise<Policy> {
-  const [defaults, overrides] = await Promise.all([
+  const [{ mode, ...defaults }, overrides] = await Promise.all([
     getDefaults(),
     db.select().from(checkerPoliciesTable),
   ]);
   return {
+    mode,
     defaults,
     checkers: Object.fromEntries(
       overrides.map((o) => [o.checker, { warnAt: o.warnAt, blockAt: o.blockAt }]),
@@ -42,6 +44,7 @@ export async function getPolicy(): Promise<Policy> {
 export async function describePolicy() {
   const policy = await getPolicy();
   return {
+    mode: policy.mode,
     ...policy.defaults,
     checkers: knownCheckers().map((checker) => {
       const override = policy.checkers[checker];

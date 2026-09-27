@@ -8,7 +8,7 @@ export const checkRequestSchema = z.object({
 export const issueSchema = z.object({
   start: z.number().int(),
   end: z.number().int(),
-  outcome: z.enum(["warned", "blocked"]), // what sending it as-is would do
+  outcome: z.enum(["warned", "redacted", "blocked"]), // what sending it as-is would do; "redacted": replaced with a placeholder
   title: z.string(),
   reason: z.string(),
   explanation: z.string(),

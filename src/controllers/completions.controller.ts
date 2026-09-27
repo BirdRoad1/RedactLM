@@ -24,6 +24,7 @@ import {
 } from "../services/conversations.service";
 import { audit } from "../services/audit.service";
 import { getPolicy } from "../services/detection-policy.service";
+import { placeholderFor, replaceInMessages } from "../checkers/replace";
 import { UnsupportedAttachmentError } from "../files/extract";
 import {
   prepareMessage,
@@ -51,6 +52,7 @@ const asciiJson = (value: unknown) =>
 const actionFor = {
   ignored: "allowed",
   warned: "warned",
+  redacted: "redacted",
   blocked: "blocked",
 } as const satisfies Record<Outcome, string>;
 
@@ -146,7 +148,9 @@ export async function createCompletion(c: Context<AuthEnv>) {
     throw err;
   }
 
-  const convo = continuing ?? (await createConversation(userId, userAgent));
+  // the id comes first: placeholders are tied to the conversation
+  const convo = continuing ?? crypto.randomUUID();
+  if (!continuing) await createConversation(userId, userAgent, convo);
   let position = continuing ? await nextPosition(convo) : 0;
   const firstToSave = continuing ? messages.length - 1 : 0;
   for (const [i, message] of messages.entries()) {
@@ -203,9 +207,29 @@ export async function createCompletion(c: Context<AuthEnv>) {
   };
   for (const [name, value] of Object.entries(warningHeaders)) c.header(name, value);
 
+  // Replace mode: every value that would have blocked is swapped for its
+  // placeholder, everywhere in the text and text files, before sending
+  const replacements = new Map<string, string>();
+  const replaced = scans.flatMap((scan, messageIndex) =>
+    (scan?.replacements ?? []).map(({ value, ...r }) => {
+      const placeholder = placeholderFor(value, convo);
+      replacements.set(value, placeholder);
+      return { messageIndex, ...r, placeholder };
+    }),
+  );
+  // what was swapped, where, and for which placeholder (never the value)
+  if (replaced.length) {
+    warningHeaders["X-PII-Replaced"] = asciiJson(replaced);
+    c.header("X-PII-Replaced", warningHeaders["X-PII-Replaced"]);
+  }
+
   // Only fields the schema knows about are forwarded, so unvalidated extras
   // never leave the building
-  const body: Record<string, unknown> = { ...json, model: upstreamModel };
+  const body: Record<string, unknown> = {
+    ...json,
+    model: upstreamModel,
+    messages: replaceInMessages(json.messages, replacements),
+  };
   for (const param of backend.stripParams) delete body[param];
 
   // Replies echo what they were sent, so they're masked before storage too

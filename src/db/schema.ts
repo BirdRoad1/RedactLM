@@ -88,10 +88,15 @@ export const llmDetectorTable = pgTable("llm_detector", {
     check("llm_detector_single_row", sql`${t.id} = 1`),
 ]);
 
+// What reaching blockAt does: stop the message, or swap the finding for a
+// placeholder where the content can be edited cleanly (text, text files)
+export const blockModeEnum = pgEnum("block_mode", ["block", "replace"]);
+
 // Confidence thresholds deciding what happens to a detection. null = never.
 // Single row (id = 1) of global defaults; checker_policies overrides per checker.
 export const detectionPolicyTable = pgTable("detection_policy", {
     id: integer().primaryKey().default(1),
+    mode: blockModeEnum().notNull().default("block"),
     warnAt: real("warn_at").default(0.3),
     blockAt: real("block_at").default(0.5),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
@@ -108,7 +113,7 @@ export const checkerPoliciesTable = pgTable("checker_policies", {
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
-export const outcomeEnum = pgEnum("detection_outcome", ["ignored", "warned", "blocked"]);
+export const outcomeEnum = pgEnum("detection_outcome", ["ignored", "warned", "redacted", "blocked"]);
 
 // What was found in a message, without the sensitive text itself
 export const messageDetectionsTable = pgTable("message_detections", {

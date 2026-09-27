@@ -12,7 +12,7 @@ export const thresholdsSchema = z
   .refine(ordered, orderedError);
 
 export const updateDefaultsSchema = z
-  .object({ warnAt: threshold, blockAt: threshold })
+  .object({ warnAt: threshold, blockAt: threshold, mode: z.enum(["block", "replace"]) })
   .partial()
   .strict();
 

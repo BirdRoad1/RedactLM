@@ -70,6 +70,7 @@ const llmDetector = z.object({
 
 const threshold = z.number().nullable();
 const detectionPolicy = z.object({
+  mode: z.enum(["block", "replace"]),
   warnAt: threshold,
   blockAt: threshold,
   checkers: z.array(
@@ -275,6 +276,10 @@ export const openApiDoc = {
           200: {
             description: "Completion, or an SSE stream when `stream` is true",
             headers: {
+              "X-PII-Replaced": {
+                description: "Present in replace mode when something was swapped for a placeholder before sending. JSON array of `{messageIndex, title, start, end, source?, placeholder}` (positions in the original text; never the value itself).",
+                schema: { type: "string" },
+              },
               "X-Partially-Checked": {
                 description: "Present when a new message or attachment was longer than the LLM detector reads (`maxChars`): it passed, but only the rule-based checks covered all of it. JSON array of `{messageIndex, source?, checkedChars, totalChars}`; also recorded in the audit log.",
                 schema: { type: "string" },
@@ -406,20 +411,20 @@ export const openApiDoc = {
         tags: ["Settings"],
         summary: "Get the warn/block thresholds",
         description:
-          "Detections carry a confidence from 0 to 1. At or above `blockAt` the request is rejected; at or above `warnAt` it goes through with a warning; below both it's only recorded. `null` means never. `checkers` lists every checker with its effective thresholds; `overridden` ones don't follow the global values.",
+          "`mode` says what reaching `blockAt` does: `block` stops the message; `replace` swaps what was found for a placeholder like `redacted-3f9a1c0b7e2d` and sends it, wherever that can be done cleanly (message text and plain-text files; PDFs and images still block). The same value gets the same placeholder everywhere within a conversation. Detections carry a confidence from 0 to 1. At or above `blockAt` the request is rejected; at or above `warnAt` it goes through with a warning; below both it's only recorded. `null` means never. `checkers` lists every checker with its effective thresholds; `overridden` ones don't follow the global values.",
         security: bearer,
         responses: { ...adminOnly, 200: { description: "Policy", content: json(detectionPolicy) } },
       },
       patch: {
         tags: ["Settings"],
-        summary: "Change the global warn/block thresholds",
+        summary: "Change the global warn/block thresholds and the block mode",
         security: bearer,
         requestBody: {
           required: true,
           content: {
             "application/json": {
               schema: z.toJSONSchema(updateDefaultsSchema, { io: "input" }),
-              example: { warnAt: 0.5, blockAt: 0.8 },
+              example: { warnAt: 0.5, blockAt: 0.8, mode: "replace" },
             },
           },
         },

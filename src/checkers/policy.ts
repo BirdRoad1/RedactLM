@@ -4,23 +4,41 @@ import type { Detection } from "./checker";
 export type Thresholds = { warnAt: number | null; blockAt: number | null };
 
 export type Policy = {
+  mode: "block" | "replace"; // what reaching blockAt does where content can be edited
   defaults: Thresholds;
   checkers: Record<string, Thresholds>; // overrides, keyed by checker name
 };
 
-export type Outcome = "ignored" | "warned" | "blocked";
+// "redacted": would block, but gets replaced with a placeholder instead
+export type Outcome = "ignored" | "warned" | "redacted" | "blocked";
 
-const severity: Record<Outcome, number> = { ignored: 0, warned: 1, blocked: 2 };
+const severity: Record<Outcome, number> = { ignored: 0, warned: 1, redacted: 2, blocked: 3 };
 
-export function outcomeFor(detection: Detection, policy: Policy): Outcome {
+// `editable`: the text can be changed cleanly before sending (message text,
+// text files), so in replace mode a block becomes a replacement
+export function outcomeFor(detection: Detection, policy: Policy, editable = false): Outcome {
   const { warnAt, blockAt } = policy.checkers[detection.checker] ?? policy.defaults;
-  if (blockAt !== null && detection.confidence >= blockAt) return "blocked";
+  if (blockAt !== null && detection.confidence >= blockAt) {
+    return editable && policy.mode === "replace" ? "redacted" : "blocked";
+  }
   if (warnAt !== null && detection.confidence >= warnAt) return "warned";
   return "ignored";
 }
 
 export function worstOutcome(outcomes: Outcome[]): Outcome {
   return outcomes.reduce<Outcome>((worst, o) => (severity[o] > severity[worst] ? o : worst), "ignored");
+}
+
+// Detected spans with overlapping ones merged, in order
+export function mergeSpans<T extends { start: number; end: number }>(spans: T[]) {
+  const sorted = [...spans].sort((a, b) => a.start - b.start);
+  const merged: { start: number; end: number; first: T }[] = [];
+  for (const span of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && span.start < last.end) last.end = Math.max(last.end, span.end);
+    else merged.push({ start: span.start, end: span.end, first: span });
+  }
+  return merged;
 }
 
 // Masks every detected span, whatever its outcome: anything a checker flagged
