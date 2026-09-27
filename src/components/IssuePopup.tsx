@@ -12,6 +12,9 @@ export function IssuePopup({ group, anchor }: { group: IssueGroup; anchor: DOMRe
   // one entry per kind of problem, most serious first
   const unique = [...new Map(group.issues.map((i) => [i.title, i])).values()]
     .sort((a, b) => Number(b.outcome === 'blocked') - Number(a.outcome === 'blocked'))
+  // for attachments: which pages each kind of problem is on
+  const pagesOf = (title: string) =>
+    [...new Set(group.issues.filter((i) => i.title === title && i.page).map((i) => i.page!))].sort((a, b) => a - b)
 
   return (
     <div className="issue-popup" role="tooltip" style={style}>
@@ -21,6 +24,9 @@ export function IssuePopup({ group, anchor }: { group: IssueGroup; anchor: DOMRe
             <strong>{issue.title}</strong>
             <span className={`pill ${issue.outcome}`}>{outcomeLabel(issue.outcome)}</span>
           </div>
+          {pagesOf(issue.title).length > 0 && (
+            <p className="small">{pagesOf(issue.title).length > 1 ? 'Pages' : 'Page'} {pagesOf(issue.title).join(', ')}</p>
+          )}
           <p>{issue.explanation}</p>
           <p className="muted small">{likelihood(issue.confidence)} to be sensitive.</p>
         </div>

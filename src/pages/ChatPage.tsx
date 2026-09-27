@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { BlockedError, streamChat } from '../api/chat'
+import { checkFile } from '../api/check'
 import { api } from '../api/client'
 import { deleteConversation, getConversation, listConversations } from '../api/conversations'
-import type { ChatMessage, ConversationSummary, FlaggedDetection, Issue, Model } from '../api/types'
+import type { Attachment, ChatMessage, ContentPart, ConversationSummary, FlaggedDetection, Issue, Model } from '../api/types'
+import { AttachmentChip } from '../components/AttachmentChip'
 import { CheckedTextarea } from '../components/CheckedTextarea'
 import { ConversationList } from '../components/ConversationList'
 import { HighlightedText } from '../components/HighlightedText'
@@ -11,11 +13,44 @@ import { outcomeLabel } from '../components/issues'
 import { MessageContent } from '../components/MessageContent'
 import { useLiveCheck } from '../hooks/useLiveCheck'
 
-// `stored`: loaded from history, so sensitive parts are already masked
-type Entry = ChatMessage & { warnings?: Issue[]; stored?: boolean }
+// `stored`: loaded from history, so sensitive parts are already masked.
+// `warnings` are in the text; `fileWarnings` describe ones in attachments.
+type Entry = {
+  role: ChatMessage['role']
+  content: string
+  attachments?: Attachment[]
+  warnings?: Issue[]
+  fileWarnings?: string[]
+  stored?: boolean
+}
 
 // Where the draft was blocked; shown until the user edits it
-type Blocked = { draft: string; issues: Issue[] }
+type Blocked = { draft: string; issues: Issue[]; inFiles: FlaggedDetection[] }
+
+const where = (d: FlaggedDetection) =>
+  d.source ? `"${d.source.filename}"${d.source.page ? `, page ${d.source.page}` : ''}` : ''
+
+// What the API gets: plain text, or parts when there are attachments
+function toMessage({ role, content, attachments }: Entry): ChatMessage {
+  if (!attachments?.length) return { role, content }
+  const parts: ContentPart[] = content ? [{ type: 'text', text: content }] : []
+  for (const a of attachments) {
+    parts.push(
+      a.mime.startsWith('image/')
+        ? { type: 'image_url', image_url: { url: a.dataUri } }
+        : { type: 'file', file: { filename: a.filename, file_data: a.dataUri } },
+    )
+  }
+  return { role, content: parts }
+}
+
+const readAsDataUri = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
 
 const asIssues = (detections: FlaggedDetection[], outcome: Issue['outcome']): Issue[] =>
   detections.map(({ start, end, title, reason, explanation, confidence }) => ({
@@ -33,6 +68,8 @@ export function ChatPage() {
   const [model, setModel] = useState('')
   const [entries, setEntries] = useState<Entry[]>([])
   const [draft, setDraft] = useState('')
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const fileInput = useRef<HTMLInputElement>(null)
   const [blocked, setBlocked] = useState<Blocked | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -92,14 +129,39 @@ export function ChatPage() {
     }
   }
 
+  // Each file is checked as soon as it's attached (read locally on the
+  // server with OCR; no AI model), so problems show up before sending
+  async function attach(e: ChangeEvent<HTMLInputElement>) {
+    const files = [...(e.target.files ?? [])]
+    e.target.value = ''
+    for (const file of files) {
+      const attachment: Attachment = {
+        id: crypto.randomUUID(),
+        filename: file.name,
+        mime: file.type || 'application/octet-stream',
+        dataUri: await readAsDataUri(file),
+        status: 'checking',
+        issues: [],
+      }
+      setAttachments((current) => [...current, attachment])
+      const update = (changes: Partial<Attachment>) =>
+        setAttachments((current) => current.map((a) => (a.id === attachment.id ? { ...a, ...changes } : a)))
+      checkFile(file.name, attachment.dataUri)
+        .then(({ pages, issues }) => update({ status: 'checked', pages, issues }))
+        .catch((err) => update({ status: 'error', error: err instanceof Error ? err.message : String(err) }))
+    }
+  }
+
   async function send(e: FormEvent) {
     e.preventDefault()
     const text = draft.trim()
-    if (!text || !model || busy) return
+    const files = attachments
+    if ((!text && !files.length) || !model || busy) return
 
-    const history: Entry[] = [...entries, { role: 'user', content: text }]
+    const history: Entry[] = [...entries, { role: 'user', content: text, attachments: files }]
     setEntries([...history, { role: 'assistant', content: '' }])
     setDraft('')
+    setAttachments([])
     setBlocked(null)
     setError(null)
     setBusy(true)
@@ -122,7 +184,7 @@ export function ChatPage() {
           navigate(`/c/${newId}`)
         },
         model,
-        messages: history.map(({ role, content }) => ({ role, content })),
+        messages: history.map(toMessage),
         signal: abort.current.signal,
         onDelta: appendToReply,
       })
@@ -131,7 +193,14 @@ export function ChatPage() {
         setEntries((current) =>
           current.map((entry, i) => {
             const mine = warnings.filter((w) => w.messageIndex === i)
-            return mine.length ? { ...entry, warnings: asIssues(mine, 'warned') } : entry
+            if (!mine.length) return entry
+            const inText = mine.filter((w) => !w.source)
+            const inFiles = [...new Set(mine.filter((w) => w.source).map((w) => `${w.title} in ${where(w)}`))]
+            return {
+              ...entry,
+              warnings: inText.length ? asIssues(inText, 'warned') : undefined,
+              fileWarnings: inFiles.length ? inFiles : undefined,
+            }
           }),
         )
       }
@@ -142,9 +211,14 @@ export function ChatPage() {
       // nothing was sent: take the message back out and return it to the input
       setEntries(entries)
       setDraft(text)
+      setAttachments(files)
       if (err instanceof BlockedError) {
         const mine = err.detections.filter((d) => d.messageIndex === history.length - 1)
-        setBlocked({ draft: text, issues: asIssues(mine, 'blocked') })
+        setBlocked({
+          draft: text,
+          issues: asIssues(mine.filter((d) => !d.source), 'blocked'),
+          inFiles: mine.filter((d) => d.source),
+        })
       } else {
         setError(err instanceof Error ? err.message : String(err))
       }
@@ -172,6 +246,11 @@ export function ChatPage() {
           {entries.map((entry, i) => (
             <div key={i} className={`message ${entry.role}`}>
               <div className="bubble">
+                {entry.attachments && entry.attachments.length > 0 && (
+                  <span className="attachments">
+                    {entry.attachments.map((a) => <span key={a.id} className="attachment-ref">📎 {a.filename}</span>)}
+                  </span>
+                )}
                 {entry.stored ? (
                   <MessageContent text={entry.content} />
                 ) : entry.warnings ? (
@@ -186,6 +265,7 @@ export function ChatPage() {
                   Sent with a warning: {[...new Set(entry.warnings.map((w) => w.title))].join(', ')}. Hover the highlight for details.
                 </p>
               )}
+              {entry.fileWarnings && <p className="warning">Sent with a warning: {entry.fileWarnings.join('; ')}.</p>}
             </div>
           ))}
         </div>
@@ -197,16 +277,40 @@ export function ChatPage() {
               {[...new Map(blocked.issues.map((i) => [i.title, i])).values()].map((issue) => (
                 <li key={issue.title}><strong>{issue.title}.</strong> {issue.reason}</li>
               ))}
+              {[...new Set(blocked.inFiles.map((d) => `${d.title}|${where(d)}`))].map((key) => {
+                const [title, place] = key.split('|')
+                return <li key={key}><strong>{title}</strong> in {place}.</li>
+              })}
             </ul>
-            <p className="preview">
-              <HighlightedText text={blocked.draft} issues={blocked.issues} />
-            </p>
-            <p className="muted">Remove or replace the highlighted parts and send again.</p>
+            {blocked.issues.length > 0 && (
+              <p className="preview">
+                <HighlightedText text={blocked.draft} issues={blocked.issues} />
+              </p>
+            )}
+            <p className="muted">{fixHint(blocked)}</p>
           </div>
         )}
         {error && <p className="error">{error}</p>}
 
+        {attachments.length > 0 && (
+          <div className="attachments">
+            {attachments.map((a) => (
+              <AttachmentChip key={a.id} attachment={a} onRemove={() => setAttachments((c) => c.filter((x) => x.id !== a.id))} />
+            ))}
+          </div>
+        )}
         <form className="composer" onSubmit={send}>
+          <input
+            ref={fileInput}
+            type="file"
+            multiple
+            hidden
+            accept="application/pdf,image/png,image/jpeg,image/webp,image/gif,image/bmp,text/*,.csv,.md,.json"
+            onChange={attach}
+          />
+          <button type="button" className="attach" title="Attach PDFs, images or text files" aria-label="Attach files" onClick={() => fileInput.current?.click()}>
+            📎
+          </button>
           <CheckedTextarea
             value={draft}
             issues={liveIssues}
@@ -223,7 +327,7 @@ export function ChatPage() {
           {busy ? (
             <button type="button" onClick={() => abort.current?.abort()}>Stop</button>
           ) : (
-            <button type="submit" disabled={!draft.trim() || !model}>Send</button>
+            <button type="submit" disabled={(!draft.trim() && !attachments.length) || !model}>Send</button>
           )}
         </form>
         <LiveSummary issues={liveIssues} />
@@ -243,4 +347,13 @@ function LiveSummary({ issues }: { issues: Issue[] }) {
       {blocking ? ". This message won't be sent as it is." : '.'} Hover the highlights for details.
     </p>
   )
+}
+
+function fixHint(blocked: Blocked) {
+  const steps = [
+    blocked.inFiles.length && 'remove the file or attach a version without that information',
+    blocked.issues.length && 'remove or replace the highlighted parts',
+  ].filter(Boolean)
+  const text = `${steps.join(', and ')}, then send again.`
+  return text[0]!.toUpperCase() + text.slice(1)
 }

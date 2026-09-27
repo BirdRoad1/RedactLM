@@ -160,3 +160,20 @@ mark.blocked, .mirror mark.blocked { background: var(--danger-mark); box-shadow:
   .chat-page { grid-template-columns: 1fr; }
   .history { display: none; }
 }
+
+/* Attachments */
+.attachments { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.bubble .attachments { margin-bottom: 0.3rem; }
+.attachment { position: relative; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.3rem 0.25rem 0.65rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font-size: 0.85rem; max-width: 22rem; }
+.attachment-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.attachment-status { color: var(--muted); white-space: nowrap; font-size: 0.8rem; }
+.attachment button { border: none; background: none; padding: 0 0.35rem; color: var(--muted); font-size: 1rem; }
+.attachment.ok { border-color: var(--ok); }
+.attachment.ok .attachment-status { color: var(--ok); }
+.attachment.warned { border-color: var(--warn); background: var(--warn-mark); cursor: help; }
+.attachment.warned .attachment-status { color: var(--warn); }
+.attachment.blocked { border-color: var(--danger); background: var(--danger-mark); cursor: help; }
+.attachment.blocked .attachment-status { color: var(--danger); }
+.attachment-ref { display: inline-block; font-size: 0.8em; padding: 0.05em 0.5em; border-radius: 6px; background: rgb(0 0 0 / 0.1); margin-right: 0.3rem; }
+.message.user .attachment-ref { background: rgb(255 255 255 / 0.22); }
+.composer .attach { align-self: stretch; padding: 0 0.6rem; font-size: 1.1rem; }

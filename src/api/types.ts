@@ -13,7 +13,14 @@ export type Session = { token: string; expiresAt: string }
 export type Model = { id: string; owned_by: string }
 
 export type ChatRole = 'system' | 'user' | 'assistant'
-export type ChatMessage = { role: ChatRole; content: string }
+
+// OpenAI-style content parts, for messages with attachments
+export type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
+  | { type: 'file'; file: { filename: string; file_data: string } }
+
+export type ChatMessage = { role: ChatRole; content: string | ContentPart[] }
 
 // A problem in some text, in plain language. `start`/`end` locate it; the
 // flagged text itself is never sent back.
@@ -25,12 +32,26 @@ export type Issue = {
   reason: string // "This looks like a phone number."
   explanation: string // why it matters and what to do instead
   confidence: number
+  page?: number | null // for issues in a PDF attachment
 }
 
 // An issue in a sent message, as reported by the chat endpoint
-export type FlaggedDetection = Omit<Issue, 'outcome'> & {
+export type FlaggedDetection = Omit<Issue, 'outcome' | 'page'> & {
   messageIndex: number
   checker: string // internal name; not for display
+  source?: { filename: string; page?: number } // found in this attachment
+}
+
+// A file attached to the draft, checked as soon as it's added
+export type Attachment = {
+  id: string
+  filename: string
+  mime: string
+  dataUri: string
+  status: 'checking' | 'checked' | 'error'
+  issues: Issue[]
+  pages?: number | null
+  error?: string
 }
 
 export type Trust = 'local' | 'cloud'
