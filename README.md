@@ -3,15 +3,24 @@
 ## Purpose
 Companies like T. Rowe Price use LLMs extensively for vertification and market analysis. It's important to prevent things like PII, company secrets, and other sensitive data from going to Anthropic, OpenAI, or Google. Even if they get audited and are found to protect the data well, they should not get unnecessary PII in the first place as a matter of data security.
 
-## Getting the code
+## Layout and development
 
-The web app lives in its own repo, [llm-thingy-web](../llm-thingy-web), included here as a git submodule in `llm-thingy-web/` (the Docker image builds it). Clone both at once:
+One repo, three workspaces ([Bun workspaces](https://bun.sh/docs/install/workspaces), one `bun.lock`):
+
+- `apps/server`: the API (Hono on Bun), database migrations in `drizzle/`, tests, and scripts
+- `apps/web`: the web app (React and Vite)
+- `packages/shared`: what both use: roles, the keyword rule, and the API's shapes, which the server checks its responses against (`apps/server/src/api-contract.ts`)
+
+With Postgres running and a `.env` at the repo root (see `.env.example`):
 
 ```sh
-git clone --recursive gitea:jluims/llm-thingy.git
+bun install
+bun run migrate
+bun run create-admin you@example.com you
+bun run dev          # the API on :3000 and the web app on http://localhost:5173
 ```
 
-Already cloned without it? Run `git submodule update --init`. After pulling changes that move the web app forward, run `git submodule update` again. To ship web app changes here: commit and push them in `llm-thingy-web/`, then commit the updated `llm-thingy-web` pointer in this repo.
+`bun run test` and `bun run typecheck` cover everything. After changing the database schema, run `bunx drizzle-kit generate --name what-changed` in `apps/server`.
 
 ## Run with Docker
 

@@ -1,19 +1,9 @@
 import { sql } from "drizzle-orm";
 import { boolean, check, index, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 
-// What a user may do. "admin" includes every other role.
-export const userRoles = [
-    "admin",           // everything below, and their own messages skip the checks
-    "override",        // may send a message as written: not blocked, nothing replaced
-    "no_check",        // their messages aren't checked at all
-    "review_chats",    // may read everyone's chat history
-    "view_audit",      // may read the audit log
-    "manage_users",    // may create users and change their roles
-    "manage_backends", // may add and delete LLM backends (and see their settings)
-    "manage_settings", // may change the detection policy and LLM detector
-    "manage_keywords", // may see and change the custom keyword list
-] as const;
-export type UserRole = (typeof userRoles)[number];
+// The roles live in the shared package (the web app lists them too)
+import { userRoles, type UserRole } from "@llm-thingy/shared";
+export { userRoles, type UserRole };
 export const userRoleEnum = pgEnum("user_role", userRoles);
 
 export const usersTable = pgTable("users", {

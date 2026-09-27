@@ -1,6 +1,8 @@
 import { swaggerUI } from "@hono/swagger-ui";
 import { Hono, type Context } from "hono";
 import { serveStatic } from "hono/bun";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { contextStorage } from "hono/context-storage";
 import { openApiDoc } from "./docs/openapi";
 import { env } from "./env/env";
@@ -54,12 +56,15 @@ app.get("/health", (c) => c.text("OK"));
 app.route("/api", api);
 app.route("/", api);
 
-// The built web app, when STATIC_DIR points at it (the Docker image does).
-// Files are served as they are; any other page path gets index.html, since
-// the app routes on the client (/chat/…, /admin/…). Unknown API paths keep
-// their 404.
-if (env.STATIC_DIR) {
-  const root = env.STATIC_DIR;
+// The built web app: STATIC_DIR if set, or in production the monorepo's own
+// apps/web/dist next to this server (where the Docker image puts it). In
+// development Vite serves the app instead. Files are served as they are;
+// any other page path gets index.html, since the app routes on the client
+// (/chat/…, /admin/…). Unknown API paths keep their 404.
+const builtWebApp = fileURLToPath(new URL("../../web/dist", import.meta.url));
+const staticDir = env.STATIC_DIR ?? (env.NODE_ENV === "production" && existsSync(builtWebApp) ? builtWebApp : undefined);
+if (staticDir) {
+  const root = staticDir;
   const headers = (cache: string) => (_path: string, c: Context) => {
     c.header("Cache-Control", cache);
     c.header("X-Content-Type-Options", "nosniff");

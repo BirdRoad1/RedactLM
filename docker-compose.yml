@@ -30,6 +30,9 @@ services:
   app:
     build: .
     restart: unless-stopped
+    # a tiny init process: passes docker stop's signal on and reaps
+    # leftover child processes (e.g. OCR workers)
+    init: true
     ports:
       - "${PORT:-8080}:3000"
     # only what the app needs; nothing else from .env reaches it

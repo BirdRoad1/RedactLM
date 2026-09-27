@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { api, apiFetch } from '../../api/client'
 import type { AddKeywordsResult, Keyword } from '../../api/types'
+import { normalizeKeyword } from '@llm-thingy/shared'
 
-// Same rule as the server: lowercase, letters and numbers only, single spaces
-const normalize = (keyword: string) =>
-  keyword
-    .split(/\s+/u)
-    .map((word) => word.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, ''))
-    .filter(Boolean)
-    .join(' ')
+// the server's own rule for how keywords are kept, from the shared package
+const normalize = normalizeKeyword
 
 // long lists: draw the first matches, search narrows it down
 const SHOWN = 500

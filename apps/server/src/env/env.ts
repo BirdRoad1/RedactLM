@@ -1,3 +1,4 @@
+import "./load-env";
 import { envSchema } from "../schema/env.schema";
 
 const parsed = envSchema.safeParse(process.env);

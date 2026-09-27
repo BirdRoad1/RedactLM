@@ -1,41 +1,21 @@
 {
   "name": "llm-thingy",
-  "module": "index.ts",
-  "scripts": {
-    "dev": "bun run --hot src/index.ts",
-    "create-admin": "bun run scripts/create-admin.ts",
-    "test": "bun test",
-    "migrate": "bun run scripts/migrate.ts",
-    "start": "bun run scripts/migrate.ts && bun run src/index.ts",
-    "load-test": "bun run scripts/load-test.ts",
-    "load-test:live": "bun run scripts/load-test-live.ts"
-  },
-  "type": "module",
   "private": true,
-  "devDependencies": {
-    "@anthropic-ai/sdk": "^0.128.0",
-    "@types/bun": "latest",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/pg": "^8.23.1",
-    "drizzle-kit": "^1.0.0-rc.4",
-    "pdf-lib": "^1.17.1",
-    "tsx": "^4.23.15"
-  },
-  "peerDependencies": {
-    "typescript": "^7"
-  },
-  "dependencies": {
-    "@hono/swagger-ui": "^0.6.1",
-    "@napi-rs/canvas": "^1.0.9",
-    "@tesseract.js-data/eng": "^1.0.0",
-    "dotenv": "^18.0.4",
-    "drizzle-orm": "^1.0.0-rc.4",
-    "hono": "^4.13.9",
-    "jsonwebtoken": "^9.0.3",
-    "openid-client": "^6.8.8",
-    "pdfjs-dist": "^6.3.289",
-    "pg": "^8.23.0",
-    "tesseract.js": "^7.0.0",
-    "zod": "^4.6.5"
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter './apps/*' dev",
+    "build": "bun run --filter @llm-thingy/web build",
+    "test": "bun run --filter '*' test",
+    "typecheck": "bun run --filter './apps/*' typecheck",
+    "lint": "bun run --filter @llm-thingy/web lint",
+    "start": "bun run --cwd apps/server start",
+    "migrate": "bun run --cwd apps/server migrate",
+    "create-admin": "bun run --cwd apps/server create-admin",
+    "load-test": "bun run --cwd apps/server load-test",
+    "load-test:live": "bun run --cwd apps/server load-test:live"
   }
 }

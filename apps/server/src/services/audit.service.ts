@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, ilike, inArray, lt, or, sql } from "drizzle-orm";
 import { tryGetContext } from "hono/context-storage";
 import { db } from "../db";
-import { roleNames } from "../auth/roles";
+import { roleName } from "../auth/roles";
 import { auditLogTable, usersTable, type UserRole } from "../db/schema";
 import type { AuditFilter } from "../schema/audit.schema";
 import { csvRow } from "./csv";
@@ -77,7 +77,7 @@ function listFindings(findings: Finding[]) {
   return [...counts].map(([what, n]) => (n > 1 ? `${what} (${n})` : what)).join(", ");
 }
 
-const listRoles = (roles: UserRole[]) => roles.map((r) => roleNames[r] ?? r).join(", ");
+const listRoles = (roles: UserRole[]) => roles.map(roleName).join(", ");
 
 function describeChanges(changes: Record<string, unknown>) {
   return Object.entries(changes)

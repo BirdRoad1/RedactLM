@@ -1,5 +1,9 @@
 import { DetectionType, type Detection } from "./checker";
 import { Confidence } from "./confidence";
+import { normalizeKeyword, normalizeWord } from "@llm-thingy/shared";
+
+// how keywords are kept is shared with the web app's preview
+export { normalizeKeyword };
 
 // Custom keywords: terms the company keeps private (project codenames,
 // clients, internal names). Matched word for word, ignoring capitalization
@@ -8,17 +12,6 @@ import { Confidence } from "./confidence";
 // the list never goes to the LLM detector.
 
 export const CHECKER_NAME = "keyword";
-
-// A word as stored and matched: letters and numbers only, lowercase
-function normalizeWord(word: string) {
-  return word.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
-}
-
-// How a keyword is stored: its words normalized and joined by single spaces.
-// Empty when nothing is left (e.g. "!!!").
-export function normalizeKeyword(keyword: string) {
-  return keyword.split(/\s+/u).map(normalizeWord).filter(Boolean).join(" ");
-}
 
 // Keywords by their first word, so checking a message looks up each of its
 // words once instead of trying every keyword: fast with thousands of them

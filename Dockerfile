@@ -3,31 +3,40 @@
 # and at the root (/v1 for OpenAI-style clients).
 # Built and run by docker-compose.yml, next to Postgres.
 
-# the web app, built to static files
-FROM oven/bun:1.4 AS web
-WORKDIR /web
-COPY llm-thingy-web/package.json llm-thingy-web/bun.lock ./
-RUN bun install --frozen-lockfile
-COPY llm-thingy-web/ ./
-RUN bun run build
-
-FROM oven/bun:1.4 AS deps
+# package manifests first, so installs are cached until they change
+FROM oven/bun:1.4 AS manifests
 WORKDIR /app
 COPY package.json bun.lock ./
-# production dependencies only: drizzle-kit, test tools etc. stay out
-RUN bun install --frozen-lockfile --production
+COPY apps/server/package.json apps/server/
+COPY apps/web/package.json apps/web/
+COPY packages/shared/package.json packages/shared/
 
+# the web app, built to static files (apps/web/dist)
+FROM manifests AS web
+RUN bun install --frozen-lockfile
+COPY packages/shared packages/shared
+COPY apps/web apps/web
+RUN bun run build
+
+# the server's production dependencies only (no React, no dev tools)
+FROM manifests AS deps
+RUN bun install --frozen-lockfile --production --filter @llm-thingy/server
+
+# the monorepo's layout, trimmed: the server finds apps/web/dist on its own
 FROM oven/bun:1.4
 WORKDIR /app
 ENV NODE_ENV=production
-ENV STATIC_DIR=/app/web
 COPY --from=deps /app/node_modules node_modules
-COPY package.json tsconfig.json ./
-COPY src src
-COPY scripts scripts
-COPY drizzle drizzle
-COPY --from=web /web/dist web
+COPY --from=deps /app/apps/server/node_modules apps/server/node_modules
+COPY package.json ./
+COPY packages/shared packages/shared
+COPY apps/server/package.json apps/server/tsconfig.json apps/server/
+COPY apps/server/src apps/server/src
+COPY apps/server/scripts apps/server/scripts
+COPY apps/server/drizzle apps/server/drizzle
+COPY --from=web /app/apps/web/dist apps/web/dist
 
+WORKDIR /app/apps/server
 # the image's own unprivileged user; nothing here writes to disk
 USER bun
 EXPOSE 3000

@@ -16,7 +16,8 @@ export const envSchema = z.object({
     TRUST_PROXY: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
     // Scales every rate limit: 2 doubles them, 0 turns them off (load tests)
     RATE_LIMIT_MULTIPLIER: z.coerce.number().min(0).default(1),
-    // The built web app, to serve alongside the API (the Docker image sets
-    // it); unset in development, where Vite serves the app
+    // Where the built web app is, to serve alongside the API. Optional: in
+    // production the monorepo's apps/web/dist is found on its own; in
+    // development Vite serves the app.
     STATIC_DIR: z.string().optional(),
 }).transform((env) => ({ ...env, PUBLIC_API_URL: (env.PUBLIC_API_URL ?? `${env.APP_URL}/api`).replace(/\/$/, "") }))

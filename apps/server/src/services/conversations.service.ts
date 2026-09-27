@@ -119,12 +119,14 @@ export async function touchConversation(conversationId: string) {
 // Newest first. Conversations where nothing was ever sent (only blocked
 // attempts) have no title and aren't listed.
 export async function listConversations(userId: number) {
-  return await db
+  const rows = await db
     .select({ id: conversationsTable.id, title: conversationsTable.title, updatedAt: conversationsTable.updatedAt })
     .from(conversationsTable)
     .where(and(eq(conversationsTable.userId, userId), isNotNull(conversationsTable.title)))
     .orderBy(desc(conversationsTable.updatedAt))
     .limit(200);
+  // every title is set: the query leaves out conversations without one
+  return rows.map((row) => ({ ...row, title: row.title! }));
 }
 
 // The messages as stored (masked), without blocked attempts, which were never sent
