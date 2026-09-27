@@ -21,6 +21,7 @@ type Entry = {
   attachments?: Attachment[]
   warnings?: Issue[]
   fileWarnings?: string[]
+  partial?: string[] // passed, but only partly checked
   stored?: boolean
 }
 
@@ -147,7 +148,7 @@ export function ChatPage() {
       const update = (changes: Partial<Attachment>) =>
         setAttachments((current) => current.map((a) => (a.id === attachment.id ? { ...a, ...changes } : a)))
       checkFile(file.name, attachment.dataUri)
-        .then(({ pages, issues }) => update({ status: 'checked', pages, issues }))
+        .then(({ pages, partial, issues }) => update({ status: 'checked', pages, partial, issues }))
         .catch((err) => update({ status: 'error', error: err instanceof Error ? err.message : String(err) }))
     }
   }
@@ -176,7 +177,7 @@ export function ChatPage() {
       })
 
     try {
-      const { warnings } = await streamChat({
+      const { warnings, partial } = await streamChat({
         conversationId: id,
         onConversationId: (newId) => {
           if (newId === id) return
@@ -188,6 +189,17 @@ export function ChatPage() {
         signal: abort.current.signal,
         onDelta: appendToReply,
       })
+      if (partial.length) {
+        const n = (x: number) => x.toLocaleString()
+        setEntries((current) =>
+          current.map((entry, i) => {
+            const mine = partial.filter((p) => p.messageIndex === i)
+            return mine.length
+              ? { ...entry, partial: mine.map((p) => `the first ${n(p.checkedChars)} of ${n(p.totalChars)} characters of ${p.source ? `"${p.source.filename}"` : 'the message'}`) }
+              : entry
+          }),
+        )
+      }
       if (warnings.length) {
         // attach each warning to the message it's about
         setEntries((current) =>
@@ -266,6 +278,11 @@ export function ChatPage() {
                 </p>
               )}
               {entry.fileWarnings && <p className="warning">Sent with a warning: {entry.fileWarnings.join('; ')}.</p>}
+              {entry.partial && (
+                <p className="partial-note" title="The rule-based checks read everything; the AI check reads a limited amount so sending stays fast.">
+                  Passed, but only partly checked: the AI check read {entry.partial.join(' and ')}.
+                </p>
+              )}
             </div>
           ))}
         </div>

@@ -28,9 +28,9 @@ export function DetectorPage() {
     e.preventDefault()
     setError(null)
     try {
-      const { enabled, backendId, model, failMode, timeoutMs, instructions } = config!
+      const { enabled, backendId, model, failMode, timeoutMs, maxChars, instructions } = config!
       setConfig(await api<LlmDetector>('/settings/llm-detector', 'PATCH', {
-        enabled, backendId, model: model || null, failMode, timeoutMs, instructions: instructions || null,
+        enabled, backendId, model: model || null, failMode, timeoutMs, maxChars, instructions: instructions || null,
       }))
       setSaved(true)
     } catch (err) {
@@ -69,6 +69,10 @@ export function DetectorPage() {
           </select>
         </label>
         <label>Timeout (ms)<input type="number" min={1000} max={300000} value={config.timeoutMs} onChange={(e) => set('timeoutMs', Number(e.target.value))} /></label>
+        <label title="Longer messages and files still pass the rule-based checks in full; they're marked as partly checked and logged.">
+          Characters it reads per message or file
+          <input type="number" min={500} max={1000000} step={500} value={config.maxChars} onChange={(e) => set('maxChars', Number(e.target.value))} />
+        </label>
         <label className="wide">
           Extra instructions
           <textarea rows={4} value={config.instructions ?? ''} onChange={(e) => set('instructions', e.target.value)} placeholder="Also flag the internal codenames Bluebird and Kestrel." />

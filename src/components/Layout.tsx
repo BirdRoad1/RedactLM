@@ -16,6 +16,7 @@ export function Layout() {
               <NavLink to="/admin/users">Users</NavLink>
               <NavLink to="/admin/policy">Detection policy</NavLink>
               <NavLink to="/admin/detector">LLM detector</NavLink>
+              <NavLink to="/admin/audit">Audit log</NavLink>
             </>
           )}
         </nav>

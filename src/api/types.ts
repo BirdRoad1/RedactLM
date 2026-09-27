@@ -51,8 +51,13 @@ export type Attachment = {
   status: 'checking' | 'checked' | 'error'
   issues: Issue[]
   pages?: number | null
+  partial?: PartialCheck | null // longer than the AI detector reads
   error?: string
 }
+
+// Passed, but only the first `checkedChars` were read by the AI detector
+// (the rule-based checks read everything)
+export type PartialCheck = { checkedChars: number; totalChars: number }
 
 export type Trust = 'local' | 'cloud'
 
@@ -89,7 +94,17 @@ export type LlmDetector = {
   model: string | null
   failMode: FailMode
   timeoutMs: number
+  maxChars: number
   instructions: string | null
+}
+
+export type AuditEntry = {
+  id: number
+  createdAt: string
+  user: string | null
+  conversationId: string | null
+  event: string
+  summary: string // plain-language description
 }
 
 export type ConversationSummary = { id: string; title: string; updatedAt: string }

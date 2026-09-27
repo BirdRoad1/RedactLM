@@ -1,6 +1,11 @@
 import { useState } from 'react'
-import type { Attachment } from '../api/types'
+import type { Attachment, PartialCheck } from '../api/types'
 import { IssuePopup } from './IssuePopup'
+
+const n = (x: number) => x.toLocaleString()
+
+export const partialNote = ({ checkedChars, totalChars }: PartialCheck) =>
+  `Only partly checked: this file has ${n(totalChars)} characters and the AI check reads the first ${n(checkedChars)}. The rule-based checks cover all of it.`
 
 // A file on the draft: what it is, whether it's safe to send, and why not
 export function AttachmentChip({ attachment: a, onRemove }: { attachment: Attachment; onRemove?: () => void }) {
@@ -9,14 +14,14 @@ export function AttachmentChip({ attachment: a, onRemove }: { attachment: Attach
   const status =
     a.status === 'checking' ? 'Checking…'
     : a.status === 'error' ? "Can't be sent"
-    : !a.issues.length ? 'No issues found'
+    : !a.issues.length ? (a.partial ? 'Passed, partly checked' : 'No issues found')
     : worst === 'blocked' ? "Won't be sent"
     : 'Has warnings'
 
   return (
     <span
-      className={`attachment ${a.status === 'error' ? 'blocked' : a.status === 'checked' ? worst : 'checking'}`}
-      onMouseEnter={(e) => (a.issues.length || a.error) && setAnchor(e.currentTarget.getBoundingClientRect())}
+      className={`attachment ${a.status === 'error' ? 'blocked' : a.status === 'checked' ? (worst === 'ok' && a.partial ? 'partial' : worst) : 'checking'}`}
+      onMouseEnter={(e) => (a.issues.length || a.error || a.partial) && setAnchor(e.currentTarget.getBoundingClientRect())}
       onMouseLeave={() => setAnchor(null)}
     >
       <span className="attachment-name" title={a.filename}>{a.filename}</span>
@@ -27,7 +32,13 @@ export function AttachmentChip({ attachment: a, onRemove }: { attachment: Attach
           <p>{a.error}</p>
         </div>
       )}
-      {anchor && !a.error && <IssuePopup group={{ start: 0, end: 0, issues: a.issues, outcome: worst === 'blocked' ? 'blocked' : 'warned' }} anchor={anchor} />}
+      {anchor && !a.error && (
+        <IssuePopup
+          group={{ start: 0, end: 0, issues: a.issues, outcome: worst === 'blocked' ? 'blocked' : 'warned' }}
+          anchor={anchor}
+          note={a.partial ? partialNote(a.partial) : undefined}
+        />
+      )}
     </span>
   )
 }

@@ -2,7 +2,7 @@ import { likelihood, outcomeLabel, type IssueGroup } from './issues'
 
 // Explains one highlighted spot. Positioned next to `anchor` (a highlight's
 // on-screen box), above it unless there's no room.
-export function IssuePopup({ group, anchor }: { group: IssueGroup; anchor: DOMRect }) {
+export function IssuePopup({ group, anchor, note }: { group: IssueGroup; anchor: DOMRect; note?: string }) {
   const above = anchor.top > 240
   const style = {
     left: Math.max(8, Math.min(anchor.left, window.innerWidth - 348)),
@@ -31,6 +31,7 @@ export function IssuePopup({ group, anchor }: { group: IssueGroup; anchor: DOMRe
           <p className="muted small">{likelihood(issue.confidence)} to be sensitive.</p>
         </div>
       ))}
+      {note && <p className={`small ${unique.length ? 'issue-note' : ''}`}>{note}</p>}
     </div>
   )
 }

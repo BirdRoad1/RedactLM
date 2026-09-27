@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router'
 import { useAuth } from './auth/AuthContext'
 import { Layout } from './components/Layout'
+import { AuditPage } from './pages/admin/AuditPage'
 import { BackendsPage } from './pages/admin/BackendsPage'
 import { DetectorPage } from './pages/admin/DetectorPage'
 import { PolicyPage } from './pages/admin/PolicyPage'
@@ -32,6 +33,7 @@ export function App() {
         <Route path="admin/users" element={<RequireAdmin><UsersPage /></RequireAdmin>} />
         <Route path="admin/policy" element={<RequireAdmin><PolicyPage /></RequireAdmin>} />
         <Route path="admin/detector" element={<RequireAdmin><DetectorPage /></RequireAdmin>} />
+        <Route path="admin/audit" element={<RequireAdmin><AuditPage /></RequireAdmin>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
