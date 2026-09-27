@@ -286,7 +286,10 @@ try {
     console.log(`  → round ${round}: ${concurrency} at once, all done in ${s(worst)}${bad.length ? `, ${bad.length} failed` : ""}\n`);
     if (batch.some((r) => r.status === 429)) {
       rateLimited = true;
-      console.log("Got a 429: stopping here.");
+      const ours = batch.some((r) => r.status === 429 && r.note?.includes("rate_limited"));
+      console.log(ours
+        ? "Got a 429 from LLM Thingy's own limits (120 chat messages a minute per user): stopping here. Fewer rounds, or restart the server with a higher RATE_LIMIT_MULTIPLIER."
+        : "Got a 429 from Anthropic: stopping here.");
     }
     if (round < ROUNDS && !rateLimited) await sleep(Math.max(0, gapMs - (performance.now() - roundStart)));
   }

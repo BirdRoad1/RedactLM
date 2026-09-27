@@ -31,7 +31,10 @@ const json = (schema: z.ZodType, io: "input" | "output" = "output") => ({
 
 const error = (description: string) => ({ description, content: json(completionErrorResponse) });
 
-const unauthorized = { 401: error("Missing or invalid token") };
+const unauthorized = {
+  401: error("Missing or invalid token"),
+  429: error("Rate limited (`type: rate_limited`); `Retry-After` says when to try again"),
+};
 // admins hold every role
 const needs = (role: UserRole) => ({ ...unauthorized, 403: error(`Needs the \`${role}\` role (or \`admin\`)`) });
 
@@ -110,7 +113,7 @@ export const openApiDoc = {
     title: "LLM Thingy",
     version: "dev",
     description:
-      "PII-filtering proxy for OpenAI-compatible LLM backends. Create the first admin with `bun run create-admin <email> <username>`, get a token from `POST /auth/login`, then click **Authorize**. \n\nAccess is by role, and `admin` holds them all: `override` may send messages as written, neither blocked nor replaced (`X-Override-Block`), `no_check` sends without any checks (as does `admin`), `review_chats` reads everyone's conversations under `/review`, `view_audit` reads `/audit-log`, `manage_users` manages `/users` (handing out only roles they hold), `manage_backends` manages `/backends`, `manage_settings` manages `/settings`, and `manage_keywords` sees and changes `/keywords`.",
+      "PII-filtering proxy for OpenAI-compatible LLM backends. Create the first admin with `bun run create-admin <email> <username>`, get a token from `POST /auth/login`, then click **Authorize**. \n\nAccess is by role, and `admin` holds them all: `override` may send messages as written, neither blocked nor replaced (`X-Override-Block`), `no_check` sends without any checks (as does `admin`), `review_chats` reads everyone's conversations under `/review`, `view_audit` reads `/audit-log`, `manage_users` manages `/users` (handing out only roles they hold), `manage_backends` manages `/backends`, `manage_settings` manages `/settings`, and `manage_keywords` sees and changes `/keywords`.\n\nRate limits are loose and per minute: sign-in and SSO 30 per address, chat 120, the model list 60, live checks 600, file checks 60 and audit exports 20 per user, and 3,000 requests of any kind per address. `RATE_LIMIT_MULTIPLIER` scales them (0 turns them off). Responses carry `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset`; over the limit is a 429 with `Retry-After`.",
   },
   servers: [{ url: "/" }],
   components: {
@@ -256,7 +259,7 @@ export const openApiDoc = {
         tags: ["Audit"],
         summary: "Audit log entries, newest first",
         description:
-          "Newest first, `limit` at a time (200 by default, at most 500); pass the last id as `before` for the next page. Filters combine. `summary` describes each entry in plain language; entries never contain checked text, passwords or API keys. Events: message_blocked, message_warned, message_replaced, assistant_pii, partially_checked, attachment_refused, detector_unavailable, conversation_deleted, settings_changed, backend_created, backend_deleted, user_created, user_roles_changed, user_deleted, user_restored, keywords_added, keywords_deleted, audit_exported, block_overridden, sent_unchecked, conversation_reviewed, login_succeeded, login_failed.",
+          "Newest first, `limit` at a time (200 by default, at most 500); pass the last id as `before` for the next page. Filters combine. `summary` describes each entry in plain language; entries never contain checked text, passwords or API keys. Events: message_blocked, message_warned, message_replaced, assistant_pii, partially_checked, attachment_refused, detector_unavailable, conversation_deleted, settings_changed, backend_created, backend_deleted, user_created, user_roles_changed, user_deleted, user_restored, rate_limited, keywords_added, keywords_deleted, audit_exported, block_overridden, sent_unchecked, conversation_reviewed, login_succeeded, login_failed.",
         security: bearer,
         parameters: [
           ...auditFilterParams,

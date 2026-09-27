@@ -1,24 +1,10 @@
 import type { Context } from "hono";
-import { getConnInfo } from "hono/bun";
 import type { AuthEnv } from "../middleware/auth";
 import { createJWT } from "../auth/jwt";
+import { clientIp } from "../middleware/client-ip";
 import { loginSchema, type LoginResponse } from "../schema/auth.schema";
 import { audit } from "../services/audit.service";
 import { getUser, verifyCredentials } from "../services/users.service";
-
-// The caller's address; X-Forwarded-For only means something behind a proxy
-// you run, so it's recorded alongside rather than trusted
-export function clientIp(c: Context) {
-  let remote: string | undefined;
-  try {
-    // "::ffff:10.0.0.5" is how IPv6 sockets show IPv4 addresses
-    remote = getConnInfo(c).remote.address?.replace(/^::ffff:(?=\d+\.)/, "");
-  } catch {
-    // not running under Bun.serve (tests)
-  }
-  const forwarded = c.req.header("X-Forwarded-For");
-  return forwarded ? `${remote ?? "?"} (forwarded for ${forwarded})` : remote;
-}
 
 export async function login(c: Context) {
   const parsed = await loginSchema.safeParseAsync(await c.req.json());

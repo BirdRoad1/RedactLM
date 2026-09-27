@@ -90,12 +90,18 @@ function completion(content: string) {
 // ---------- setup and restore ----------
 
 let savedDetector: typeof llmDetectorTable.$inferSelect | undefined;
+let detectorChanged = false; // only then is there anything to put back
 let userId: number | undefined;
 let restored = false;
 
 async function setUp() {
   const alive = await fetch(`${BASE}/`).catch(() => undefined);
   if (!alive?.ok) throw new Error(`No server answering at ${BASE}; start it first (bun run dev)`);
+  // hundreds of requests a second from one user is exactly what the rate
+  // limits stop; they'd turn the run into a wall of 429s
+  if (alive.headers.get("RateLimit-Limit")) {
+    throw new Error("The server's rate limits are on. Restart it with them off for load testing:\n  RATE_LIMIT_MULTIPLIER=0 bun run dev");
+  }
 
   const user = await ensureTestUser();
   userId = user.id;
@@ -108,6 +114,7 @@ async function setUp() {
     .returning({ id: backendsTable.id });
 
   [savedDetector] = await db.select().from(llmDetectorTable).where(eq(llmDetectorTable.id, 1));
+  detectorChanged = true;
   await db
     .insert(llmDetectorTable)
     .values({ id: 1, enabled: true, backendId: backend!.id, model: "fake-detector" })
@@ -119,10 +126,12 @@ async function setUp() {
 async function restore() {
   if (restored) return;
   restored = true;
-  if (savedDetector) {
+  // only what this run changed: a run that stopped before setting up
+  // (server down, rate limits on) must leave the detector alone
+  if (detectorChanged && savedDetector) {
     const { id: _, updatedAt: __, ...detector } = savedDetector;
     await db.update(llmDetectorTable).set(detector).where(eq(llmDetectorTable.id, 1));
-  } else {
+  } else if (detectorChanged) {
     await db.delete(llmDetectorTable).where(eq(llmDetectorTable.id, 1));
   }
   await db.delete(backendsTable).where(eq(backendsTable.slug, SLUG));

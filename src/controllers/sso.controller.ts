@@ -8,7 +8,7 @@ import type { AuthEnv } from "../middleware/auth";
 import { createSsoProviderSchema, updateSsoProviderSchema } from "../schema/sso.schema";
 import { audit } from "../services/audit.service";
 import * as sso from "../services/sso.service";
-import { clientIp } from "./auth.controller";
+import { clientIp } from "../middleware/client-ip";
 
 // The round trip's state rides in a signed cookie that lasts 10 minutes.
 // SameSite=Lax: the provider's redirect back is a top-level navigation, which

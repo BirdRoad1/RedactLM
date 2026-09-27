@@ -36,6 +36,11 @@ services:
       # where people open the app; single sign-on sends them back here
       APP_URL: ${APP_URL:-http://localhost:8080}
       OCR_WORKERS: ${OCR_WORKERS:-2}
+      # requests arrive through the web container's nginx, which records
+      # the real client address in X-Forwarded-For
+      TRUST_PROXY: "true"
+      # scales every rate limit; 0 turns them off
+      RATE_LIMIT_MULTIPLIER: ${RATE_LIMIT_MULTIPLIER:-1}
     depends_on:
       db:
         condition: service_healthy

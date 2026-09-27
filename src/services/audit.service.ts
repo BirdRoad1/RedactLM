@@ -38,6 +38,7 @@ export type AuditEvents = {
   user_roles_changed: { email: string; added: UserRole[]; removed: UserRole[] };
   user_deleted: { email: string };
   user_restored: { email: string };
+  rate_limited: { limit: string; perMinute: number; ip?: string };
   login_succeeded: { email: string; ip?: string; via?: string }; // via: the SSO provider, if any
   login_failed: { email: string; ip?: string; via?: string; reason?: string };
 };
@@ -173,6 +174,10 @@ export function describeEvent(event: string, details: unknown): string {
         r.removed.length && `took away ${listRoles(r.removed)}`,
       ].filter(Boolean);
       return `Changed ${r.email}'s roles: ${parts.join("; ")}.`;
+    }
+    case "rate_limited": {
+      const r = d as AuditEvents["rate_limited"];
+      return `Went over the "${r.limit}" limit of ${number(r.perMinute)} requests a minute${r.ip ? ` from ${r.ip}` : ""}; further requests were refused until the minute was up.`;
     }
     case "login_succeeded": {
       const l = d as AuditEvents["login_succeeded"];

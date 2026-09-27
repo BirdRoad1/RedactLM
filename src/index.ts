@@ -4,6 +4,7 @@ import { contextStorage } from "hono/context-storage";
 import { openApiDoc } from "./docs/openapi";
 import { env } from "./env/env";
 import { logRequests } from "./middleware/logger";
+import { rateLimit } from "./middleware/rate-limit";
 import { authRoutes } from "./routes/auth.routes";
 import { meRoutes } from "./routes/me.routes";
 import { checkRoutes } from "./routes/check.routes";
@@ -21,6 +22,9 @@ const app = new Hono();
 // lets code deep in a request (audit logging) see who made it
 app.use(contextStorage());
 app.use(logRequests);
+// a backstop for every route, per address; tighter limits sit on the
+// expensive ones
+app.use(rateLimit("everything", 3000, "ip"));
 
 app.get("/", (c) => c.text("OK"));
 

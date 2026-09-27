@@ -11,4 +11,9 @@ export const envSchema = z.object({
     // This API's address as browsers see it (behind the web app's /api proxy
     // by default); SSO providers redirect here
     PUBLIC_API_URL: z.url().optional(),
+    // Behind a proxy we run (the web container's nginx): take the client's
+    // address from the last X-Forwarded-For entry, for rate limits and logs
+    TRUST_PROXY: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+    // Scales every rate limit: 2 doubles them, 0 turns them off (load tests)
+    RATE_LIMIT_MULTIPLIER: z.coerce.number().min(0).default(1),
 }).transform((env) => ({ ...env, PUBLIC_API_URL: (env.PUBLIC_API_URL ?? `${env.APP_URL}/api`).replace(/\/$/, "") }))

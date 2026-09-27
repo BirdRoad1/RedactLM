@@ -15,9 +15,10 @@ Open http://localhost:8080 and sign in. Database migrations run whenever the API
 
 ## Load testing
 
-With the dev server running (`bun run dev`):
+With the dev server running with its rate limits off:
 
 ```sh
+RATE_LIMIT_MULTIPLIER=0 bun run dev
 bun run load-test --users 100 --duration 30
 ```
 
