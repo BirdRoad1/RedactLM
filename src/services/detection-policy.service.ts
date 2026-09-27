@@ -1,10 +1,12 @@
 import { eq } from "drizzle-orm";
 import type z from "zod";
+import { CHECKER_NAME as KEYWORD_CHECKER } from "../checkers/keywords";
 import { CHECKER_NAME as LLM_CHECKER } from "../checkers/llm/llm-checker";
 import type { Policy, Thresholds } from "../checkers/policy";
 import { staticCheckerNames } from "../checkers/run-static-checks";
 import { db } from "../db";
 import { checkerPoliciesTable, detectionPolicyTable } from "../db/schema";
+import { getKeywordIndex } from "./keywords.service";
 import {
   thresholdsOrdered,
   type thresholdsSchema,
@@ -18,7 +20,7 @@ const DEFAULTS: Thresholds = { warnAt: 0.3, blockAt: 0.5 };
 const DEFAULT_MODE: Policy["mode"] = "block";
 
 export function knownCheckers() {
-  return [...staticCheckerNames, LLM_CHECKER];
+  return [...staticCheckerNames, KEYWORD_CHECKER, LLM_CHECKER];
 }
 
 async function getDefaults(): Promise<Thresholds & { mode: Policy["mode"] }> {
@@ -26,14 +28,17 @@ async function getDefaults(): Promise<Thresholds & { mode: Policy["mode"] }> {
   return row ? { warnAt: row.warnAt, blockAt: row.blockAt, mode: row.mode } : { ...DEFAULTS, mode: DEFAULT_MODE };
 }
 
+// Everything a check needs: thresholds, mode, and the custom keywords
 export async function getPolicy(): Promise<Policy> {
-  const [{ mode, ...defaults }, overrides] = await Promise.all([
+  const [{ mode, ...defaults }, overrides, keywords] = await Promise.all([
     getDefaults(),
     db.select().from(checkerPoliciesTable),
+    getKeywordIndex(),
   ]);
   return {
     mode,
     defaults,
+    keywords,
     checkers: Object.fromEntries(
       overrides.map((o) => [o.checker, { warnAt: o.warnAt, blockAt: o.blockAt }]),
     ),

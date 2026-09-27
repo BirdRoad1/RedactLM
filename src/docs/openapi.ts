@@ -17,6 +17,7 @@ import {
 } from "../schema/check.schema";
 import { updateLlmDetectorSchema } from "../schema/llm-detector.schema";
 import { createUserSchema, roleSchema, setRolesSchema } from "../schema/user.schema";
+import { addKeywordsSchema } from "../schema/keywords.schema";
 import type { UserRole } from "../db/schema";
 
 // Hand-assembled OpenAPI doc for dev use. Bodies come from the real Zod
@@ -99,7 +100,7 @@ export const openApiDoc = {
     title: "LLM Thingy",
     version: "dev",
     description:
-      "PII-filtering proxy for OpenAI-compatible LLM backends. Create the first admin with `bun run create-admin <email> <username>`, get a token from `POST /auth/login`, then click **Authorize**. \n\nAccess is by role, and `admin` holds them all: `override` may send messages as written, neither blocked nor replaced (`X-Override-Block`), `no_check` sends without any checks (as does `admin`), `review_chats` reads everyone's conversations under `/review`, `view_audit` reads `/audit-log`, `manage_users` manages `/users` (handing out only roles they hold), `manage_backends` manages `/backends`, and `manage_settings` manages `/settings`.",
+      "PII-filtering proxy for OpenAI-compatible LLM backends. Create the first admin with `bun run create-admin <email> <username>`, get a token from `POST /auth/login`, then click **Authorize**. \n\nAccess is by role, and `admin` holds them all: `override` may send messages as written, neither blocked nor replaced (`X-Override-Block`), `no_check` sends without any checks (as does `admin`), `review_chats` reads everyone's conversations under `/review`, `view_audit` reads `/audit-log`, `manage_users` manages `/users` (handing out only roles they hold), `manage_backends` manages `/backends`, `manage_settings` manages `/settings`, and `manage_keywords` sees and changes `/keywords`.",
   },
   servers: [{ url: "/" }],
   components: {
@@ -227,7 +228,7 @@ export const openApiDoc = {
         tags: ["Audit"],
         summary: "Latest audit log entries",
         description:
-          "Newest first, at most 200. `summary` describes each entry in plain language; entries never contain checked text, passwords or API keys. Events: message_blocked, message_warned, message_replaced, partially_checked, attachment_refused, detector_unavailable, conversation_deleted, settings_changed, backend_created, backend_deleted, user_created, user_roles_changed, block_overridden, sent_unchecked, conversation_reviewed, login_succeeded, login_failed.",
+          "Newest first, at most 200. `summary` describes each entry in plain language; entries never contain checked text, passwords or API keys. Events: message_blocked, message_warned, message_replaced, partially_checked, attachment_refused, detector_unavailable, conversation_deleted, settings_changed, backend_created, backend_deleted, user_created, user_roles_changed, keywords_added, keywords_deleted, block_overridden, sent_unchecked, conversation_reviewed, login_succeeded, login_failed.",
         security: bearer,
         parameters: [{ name: "event", in: "query", required: false, description: "Only this kind of entry", schema: { type: "string" } }],
         responses: {
@@ -418,6 +419,57 @@ export const openApiDoc = {
           },
           404: { description: "Not found" },
         },
+      },
+    },
+    "/keywords": {
+      get: {
+        tags: ["Keywords"],
+        security: bearer,
+        summary: "The custom keyword list",
+        description: "Terms the company keeps private (project codenames, clients, internal names). Every message and attachment is checked for them by the rules, as the `keyword` checker: they block, get replaced or warn like any other finding, per `/settings/detection-policy`. They are never sent to the LLM detector.",
+        responses: {
+          ...needs("manage_keywords"),
+          200: {
+            description: "Keywords, alphabetically",
+            content: json(z.array(z.object({ id: z.number().int(), keyword: z.string(), createdAt: z.string(), createdBy: z.string().nullable() }))),
+          },
+        },
+      },
+      post: {
+        tags: ["Keywords"],
+        security: bearer,
+        summary: "Add keywords",
+        description: "Each is saved normalized: lowercase, letters and numbers only, single spaces between words (`\"What\'s up?\"` → `whats up`). Messages are matched the same way, on whole words, so `whats up` also catches \"WHAT\'S UP!!\". Duplicates (after normalizing) are skipped. Only the count is recorded in the audit log.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: z.toJSONSchema(addKeywordsSchema, { io: "input" }),
+              example: { keywords: ["Project Falcon", "What's up?"] },
+            },
+          },
+        },
+        responses: {
+          ...needs("manage_keywords"),
+          200: {
+            description: "What happened to each",
+            content: json(z.object({
+              added: z.array(z.string()).describe("As saved"),
+              alreadyListed: z.array(z.string()),
+              empty: z.array(z.string()).describe("Had no letters or numbers, so nothing to save"),
+            })),
+          },
+          400: { description: "Invalid request" },
+        },
+      },
+    },
+    "/keywords/{id}": {
+      delete: {
+        tags: ["Keywords"],
+        security: bearer,
+        summary: "Remove a keyword",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+        responses: { ...needs("manage_keywords"), 204: { description: "Removed" }, 404: { description: "Not found" } },
       },
     },
     "/backends": {

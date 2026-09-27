@@ -58,7 +58,7 @@ function replacementsIn(text: string, scored: ScoredDetection[], source?: Source
 // before sending, so in replace mode blocks become replacements. Throws
 // LlmDetectorUnavailableError when the detector fails closed.
 export async function scanText(text: string, policy: Policy, signal?: AbortSignal, llmChars = Infinity, editable = false): Promise<Scan> {
-  const scored = score(runStaticChecks(text), policy, editable);
+  const scored = score(runStaticChecks(text, policy.keywords), policy, editable);
 
   if (llmChars > 0 && worstOutcome(scored.map((s) => s.outcome)) !== "blocked") {
     scored.push(...score(await runLlmChecks(text.slice(0, llmChars), signal), policy, editable));
@@ -69,7 +69,7 @@ export async function scanText(text: string, policy: Policy, signal?: AbortSigna
 
 // Static checks only, for text we store but don't gate on (assistant replies)
 export function scanStatic(text: string, policy: Policy, editable = false): Scan {
-  const scored = score(runStaticChecks(text), policy, editable);
+  const scored = score(runStaticChecks(text, policy.keywords), policy, editable);
   return { scored, outcome: worstOutcome(scored.map((s) => s.outcome)) };
 }
 

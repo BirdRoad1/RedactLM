@@ -1,4 +1,5 @@
 import type { Detection } from "./checker";
+import type { KeywordIndex } from "./keywords";
 
 // Confidence at or above which a detection warns / blocks; null = never
 export type Thresholds = { warnAt: number | null; blockAt: number | null };
@@ -7,6 +8,7 @@ export type Policy = {
   mode: "block" | "replace"; // what reaching blockAt does where content can be edited
   defaults: Thresholds;
   checkers: Record<string, Thresholds>; // overrides, keyed by checker name
+  keywords?: KeywordIndex; // the custom keywords, checked with the rules
 };
 
 // "redacted": would block, but gets replaced with a placeholder instead

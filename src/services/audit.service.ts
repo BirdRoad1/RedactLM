@@ -23,6 +23,8 @@ export type AuditEvents = {
   conversation_deleted: { title: string | null };
   conversation_reviewed: { owner: string; title: string | null };
   settings_changed: { setting: string; changes: Record<string, unknown> };
+  keywords_added: { count: number };
+  keywords_deleted: { count: number };
   backend_created: { name: string; slug: string; trust: string };
   backend_deleted: { name: string; slug: string };
   // entries from before roles have isAdmin instead
@@ -113,6 +115,14 @@ export function describeEvent(event: string, details: unknown): string {
     case "settings_changed": {
       const s = d as AuditEvents["settings_changed"];
       return `Changed ${s.setting}: ${describeChanges(s.changes)}.`;
+    }
+    case "keywords_added": {
+      const n = (d as AuditEvents["keywords_added"]).count;
+      return `Added ${number(n)} ${n === 1 ? "keyword" : "keywords"} to the keyword list.`;
+    }
+    case "keywords_deleted": {
+      const n = (d as AuditEvents["keywords_deleted"]).count;
+      return `Removed ${number(n)} ${n === 1 ? "keyword" : "keywords"} from the keyword list.`;
     }
     case "backend_created": {
       const b = d as AuditEvents["backend_created"];

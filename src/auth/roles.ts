@@ -24,4 +24,5 @@ export const roleNames: Record<UserRole, string> = {
   manage_users: "Manages users",
   manage_backends: "Manages backends",
   manage_settings: "Manages detection settings",
+  manage_keywords: "Manages keywords",
 };

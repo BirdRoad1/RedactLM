@@ -14,6 +14,7 @@ import { usersRoutes } from "./routes/users.routes";
 import { backendsRoutes } from "./routes/backends.routes";
 import { settingsRoutes } from "./routes/settings.routes";
 import { reviewRoutes } from "./routes/review.routes";
+import { keywordsRoutes } from "./routes/keywords.routes";
 
 const app = new Hono();
 
@@ -33,6 +34,7 @@ app.route("/backends", backendsRoutes);
 app.route("/settings", settingsRoutes);
 app.route("/audit-log", auditRoutes);
 app.route("/review", reviewRoutes);
+app.route("/keywords", keywordsRoutes);
 
 // API docs for development only
 if (env.NODE_ENV !== "production") {

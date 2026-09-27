@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { Checker } from './checker';
+import { findKeywords, type KeywordIndex } from './keywords';
 
 const dirURL = new URL('./impl', import.meta.url);
 
@@ -8,6 +9,8 @@ const checkers: Checker[] = (await Promise.all(fs.readdirSync(dirURL).map(u => p
 
 export const staticCheckerNames = checkers.map((checker) => checker.name);
 
-export function runStaticChecks(data: string) {
-    return checkers.flatMap(checker => checker.check(data));
+// `keywords`: the custom keyword list, when there is one
+export function runStaticChecks(data: string, keywords?: KeywordIndex) {
+    const found = checkers.flatMap(checker => checker.check(data));
+    return keywords ? [...found, ...findKeywords(data, keywords)] : found;
 }

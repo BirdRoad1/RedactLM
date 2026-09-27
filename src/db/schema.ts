@@ -11,6 +11,7 @@ export const userRoles = [
     "manage_users",    // may create users and change their roles
     "manage_backends", // may add and delete LLM backends (and see their settings)
     "manage_settings", // may change the detection policy and LLM detector
+    "manage_keywords", // may see and change the custom keyword list
 ] as const;
 export type UserRole = (typeof userRoles)[number];
 export const userRoleEnum = pgEnum("user_role", userRoles);
@@ -158,4 +159,16 @@ export const auditLogTable = pgTable("audit_log", {
     details: jsonb().notNull(),                 // never contains the checked text itself
 }, (t) => [
     index("audit_log_created_idx").on(t.createdAt),
+]);
+
+// Terms the company keeps private, checked in every message by the rules
+// only (never sent to the LLM detector). Stored normalized: lowercase,
+// letters and numbers only, single spaces ("What's up?" → "whats up").
+export const keywordsTable = pgTable("keywords", {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    keyword: text().notNull(),
+    createdBy: integer("created_by").references(() => usersTable.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+    uniqueIndex("keywords_keyword_idx").on(t.keyword),
 ]);
