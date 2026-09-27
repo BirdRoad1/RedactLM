@@ -14,6 +14,7 @@ import { HighlightedText } from '../components/HighlightedText'
 import { outcomeLabel } from '../components/issues'
 import { Markdown } from '../components/Markdown'
 import { MessageContent } from '../components/MessageContent'
+import { ModelPicker } from '../components/ModelPicker'
 import { PaperclipIcon } from '../components/icons'
 import { useLiveCheck } from '../hooks/useLiveCheck'
 
@@ -321,11 +322,7 @@ export function ChatPage() {
       />
       <div className="chat">
         <div className="chat-toolbar">
-          <select value={model} onChange={(e) => setModel(e.target.value)}>
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>{m.name} · {m.backend}</option>
-            ))}
-          </select>
+          <ModelPicker models={models} value={model} onChange={setModel} />
         </div>
 
         <div className="messages">

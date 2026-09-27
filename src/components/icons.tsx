@@ -31,3 +31,15 @@ export const NewChatIcon = ({ size }: { size?: number }) => (
     <path d="M18.4 2.6a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z" />
   </Icon>
 )
+
+export const ChevronDownIcon = ({ size }: { size?: number }) => (
+  <Icon size={size}>
+    <path d="M6 9l6 6 6-6" />
+  </Icon>
+)
+
+export const CheckIcon = ({ size }: { size?: number }) => (
+  <Icon size={size}>
+    <path d="M5 12.5l4.5 4.5L19 7.5" />
+  </Icon>
+)

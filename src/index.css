@@ -320,3 +320,27 @@ kbd { font: inherit; font-size: 0.85em; border: 1px solid var(--border); border-
 .markdown th, .markdown td { border: 1px solid var(--border); padding: 0.3em 0.6em; }
 .markdown .md-image { color: var(--muted); font-style: italic; }
 .message.assistant .bubble:has(> .markdown) { min-width: 0; max-width: 100%; }
+
+/* Model picker */
+.model-picker { position: relative; }
+.model-picker-button { display: inline-flex; align-items: center; gap: 0.5rem; max-width: 100%; padding: 0.4rem 0.7rem 0.4rem 0.9rem; border-radius: 999px; background: var(--bg); color: var(--fg); }
+.model-picker-button:hover { background: color-mix(in srgb, var(--fg) 5%, var(--bg)); }
+.model-picker-button[aria-expanded='true'] { border-color: var(--accent); }
+.model-picker-button .model-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.model-picker-button .model-backend { color: var(--muted); font-size: 0.85em; white-space: nowrap; }
+.model-picker-button .icon { color: var(--muted); flex: none; }
+.model-picker-list {
+  position: absolute; z-index: 20; top: calc(100% + 6px); left: 0;
+  min-width: 260px; max-width: min(360px, calc(100vw - 2rem)); max-height: min(60vh, 420px); overflow-y: auto;
+  margin: 0; padding: 0.35rem; list-style: none;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.14), 0 2px 6px rgb(0 0 0 / 0.08);
+  outline: none;
+}
+.model-picker-list ul { margin: 0; padding: 0; list-style: none; }
+.model-group { padding: 0.55rem 0.6rem 0.25rem; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.model-picker-list > li:first-child .model-group { padding-top: 0.3rem; }
+.model-option { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.45rem 0.6rem; border-radius: 8px; cursor: pointer; }
+.model-option.active { background: color-mix(in srgb, var(--fg) 7%, transparent); }
+.model-option[aria-selected='true'] { font-weight: 600; }
+.model-option .icon { color: var(--accent); flex: none; }
