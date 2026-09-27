@@ -7,6 +7,9 @@ export const model = z.object({
     object: z.literal("model"),
     created: z.number().int(),  // Unix seconds
     owned_by: z.string(),       // e.g. "openai", "anthropic", or your org for local models
+    // Ours, beyond the OpenAI shape (clients ignore fields they don't know):
+    name: z.string(),           // readable name when the backend gives one ("Claude Opus 5.5"), else the model's own id
+    backend: z.string(),        // the backend's name, as admins set it ("Claude")
 });
 
 // ---------- GET /v1/models ----------

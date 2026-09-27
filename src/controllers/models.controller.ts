@@ -4,13 +4,15 @@ import type { ModelsList } from "../schema/models-request.schema";
 import { listEnabledBackends } from "../services/backends.service";
 import { upstreamJson } from "../services/upstream.service";
 
-// Backends don't all fill in every field, only `id` is needed
+// Backends don't all fill in every field, only `id` is needed. Some (like
+// Anthropic) also give a readable name.
 const upstreamModels = z.object({
   data: z.array(
     z.object({
       id: z.string(),
       created: z.number().int().optional(),
       owned_by: z.string().optional(),
+      display_name: z.string().optional(),
     }),
   ),
 });
@@ -35,6 +37,8 @@ export async function listModels(c: Context) {
           object: "model" as const,
           created: model.created ?? 0,
           owned_by: model.owned_by ?? backend.name,
+          name: model.display_name || model.id,
+          backend: backend.name,
         }));
       } catch (err) {
         // one broken backend shouldn't hide the others' models
