@@ -47,6 +47,9 @@ h2 { font-size: 1.2rem; font-weight: 650; margin: 1.5rem 0 0.5rem; }
 code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
 code { background: var(--surface); padding: 0 0.25em; border-radius: 3px; }
 button, input, select, textarea { font: inherit; color: inherit; }
+/* links in the accent colour, which has a lighter shade in dark mode; this
+   also replaces the browser's own blue and visited purple */
+a { color: var(--accent); text-underline-offset: 0.15em; }
 input, select, textarea { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 0.35rem 0.5rem; }
 button { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 0.35rem 0.8rem; cursor: pointer; }
 button:disabled { opacity: 0.5; cursor: default; }
@@ -648,3 +651,9 @@ a.brand { color: inherit; text-decoration: none; }
 
 .event-tag.assistant_pii { border-color: var(--warn); color: var(--warn); }
 .event-tag.rate_limited { border-color: var(--danger); color: var(--danger); }
+
+/* Review chats: titles in the accent colour say "link" (the same colour once
+   visited), underlined on hover, and the row lights up */
+a.review-link { font-weight: 500; text-decoration: none; }
+a.review-link:hover, a.review-link:focus-visible { text-decoration: underline; }
+tr:has(> td > a.review-link):hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }

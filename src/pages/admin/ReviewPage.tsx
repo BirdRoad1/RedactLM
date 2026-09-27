@@ -58,7 +58,7 @@ function ConversationTable() {
                 <td className="nowrap">{new Date(r.updatedAt).toLocaleString()}</td>
                 <td>{r.user}</td>
                 <td>
-                  <Link to={`/admin/review/${r.id}`}>
+                  <Link to={`/admin/review/${r.id}`} className="review-link">
                     {r.title?.replace(/\[REDACTED: ([^\]]+)\]/g, '[$1]') ?? <span className="muted">Nothing sent (only blocked attempts)</span>}
                   </Link>
                 </td>
