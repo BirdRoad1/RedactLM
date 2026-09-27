@@ -9,7 +9,7 @@ import { getRoles } from "../services/users.service";
 export type AuthEnv = {
   Variables: {
     userId: number;
-    roles: UserRole[]; // set by requireRole only
+    roles: UserRole[];
   };
 };
 
@@ -32,12 +32,16 @@ function userIdFromRequest(c: Context) {
   }
 }
 
-// Any logged-in user; sets `userId`
+// Any logged-in user; sets `userId` and `roles`. Checked against the DB, so
+// a deleted user's token stops working right away.
 export const requireUser = createMiddleware<AuthEnv>(async (c, next) => {
   const userId = userIdFromRequest(c);
   if (userId === undefined) return c.json(unauthorized, 401);
+  const roles = await getRoles(userId);
+  if (!roles) return c.json(unauthorized, 401);
 
   c.set("userId", userId);
+  c.set("roles", roles);
   await next();
 });
 

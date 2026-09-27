@@ -18,6 +18,7 @@ import {
 import { updateLlmDetectorSchema } from "../schema/llm-detector.schema";
 import { createUserSchema, roleSchema, setRolesSchema } from "../schema/user.schema";
 import { addKeywordsSchema } from "../schema/keywords.schema";
+import { createSsoProviderSchema, updateSsoProviderSchema } from "../schema/sso.schema";
 import type { UserRole } from "../db/schema";
 
 // Hand-assembled OpenAPI doc for dev use. Bodies come from the real Zod
@@ -57,6 +58,7 @@ const user = z.object({
   username: z.string(),
   roles: z.array(roleSchema),
   createdAt: z.string(),
+  deletedAt: z.string().nullable().describe("Set once deleted (soft delete)"),
 });
 
 const llmDetector = z.object({
@@ -94,6 +96,14 @@ const flaggedDetection = z.object({
 
 const bearer = [{ bearerAuth: [] }];
 
+const auditFilterParams = [
+  { name: "event", in: "query", required: false, description: "One event, or several separated by commas", schema: { type: "string" }, example: "message_blocked,block_overridden" },
+  { name: "user", in: "query", required: false, description: "Part of the acting user's email (or the email tried on a login)", schema: { type: "string" } },
+  { name: "conversation", in: "query", required: false, description: "Only entries about this conversation", schema: { type: "string", format: "uuid" } },
+  { name: "from", in: "query", required: false, description: "At or after this time (ISO 8601 with a time zone)", schema: { type: "string", format: "date-time" } },
+  { name: "to", in: "query", required: false, description: "Before this time (ISO 8601 with a time zone)", schema: { type: "string", format: "date-time" } },
+];
+
 export const openApiDoc = {
   openapi: "3.1.0",
   info: {
@@ -121,6 +131,24 @@ export const openApiDoc = {
           400: { description: "Invalid request" },
           401: { description: "Invalid email or password" },
         },
+      },
+    },
+    "/auth/sso": {
+      get: {
+        tags: ["Auth"],
+        summary: "Single sign-on options for the login page",
+        security: [],
+        responses: { 200: { description: "Enabled providers", content: json(z.array(z.object({ slug: z.string(), name: z.string() }))) } },
+      },
+    },
+    "/auth/sso/{slug}/start": {
+      get: {
+        tags: ["Auth"],
+        summary: "Start signing in with a provider (browser navigation)",
+        description: "Redirects to the provider (OpenID Connect authorization code flow with PKCE, state and nonce; the state rides in a signed 10-minute cookie). The provider sends the browser back to `/auth/sso/{slug}/callback`, which redirects to the web app at `APP_URL/sso#token=...&expiresAt=...`, or `#error=...`. Only users who already have an account can sign in: the provider's verified email is matched to theirs the first time, and the provider's id for them after that.",
+        security: [],
+        parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }],
+        responses: { 302: { description: "To the provider, or back to the web app with an error" } },
       },
     },
     "/me": {
@@ -226,13 +254,18 @@ export const openApiDoc = {
     "/audit-log": {
       get: {
         tags: ["Audit"],
-        summary: "Latest audit log entries",
+        summary: "Audit log entries, newest first",
         description:
-          "Newest first, at most 200. `summary` describes each entry in plain language; entries never contain checked text, passwords or API keys. Events: message_blocked, message_warned, message_replaced, partially_checked, attachment_refused, detector_unavailable, conversation_deleted, settings_changed, backend_created, backend_deleted, user_created, user_roles_changed, keywords_added, keywords_deleted, block_overridden, sent_unchecked, conversation_reviewed, login_succeeded, login_failed.",
+          "Newest first, `limit` at a time (200 by default, at most 500); pass the last id as `before` for the next page. Filters combine. `summary` describes each entry in plain language; entries never contain checked text, passwords or API keys. Events: message_blocked, message_warned, message_replaced, partially_checked, attachment_refused, detector_unavailable, conversation_deleted, settings_changed, backend_created, backend_deleted, user_created, user_roles_changed, user_deleted, user_restored, keywords_added, keywords_deleted, audit_exported, block_overridden, sent_unchecked, conversation_reviewed, login_succeeded, login_failed.",
         security: bearer,
-        parameters: [{ name: "event", in: "query", required: false, description: "Only this kind of entry", schema: { type: "string" } }],
+        parameters: [
+          ...auditFilterParams,
+          { name: "before", in: "query", required: false, description: "Only entries older than this id (paging)", schema: { type: "integer" } },
+          { name: "limit", in: "query", required: false, description: "How many, 1–500 (default 200)", schema: { type: "integer" } },
+        ],
         responses: {
           ...needs("view_audit"),
+          400: { description: "Invalid filters" },
           200: {
             description: "Entries",
             content: json(z.array(z.object({
@@ -245,6 +278,20 @@ export const openApiDoc = {
               summary: z.string(),
             }))),
           },
+        },
+      },
+    },
+    "/audit-log/export.csv": {
+      get: {
+        tags: ["Audit"],
+        summary: "Download every matching entry as CSV",
+        description: "Same filters as `/audit-log`, but all matching entries, newest first. Columns: id, time (ISO), user, event, summary, conversation, details (JSON). Cells that would start a spreadsheet formula get a leading apostrophe. The export is itself recorded (`audit_exported`).",
+        security: bearer,
+        parameters: auditFilterParams,
+        responses: {
+          ...needs("view_audit"),
+          200: { description: "CSV file", content: { "text/csv": { schema: { type: "string" } } } },
+          400: { description: "Invalid filters" },
         },
       },
     },
@@ -345,6 +392,7 @@ export const openApiDoc = {
         tags: ["Users"],
         security: bearer,
         summary: "List users with their roles",
+        parameters: [{ name: "deleted", in: "query", required: false, description: "`true` includes deleted users", schema: { type: "boolean" } }],
         responses: { ...needs("manage_users"), 200: { description: "Users", content: json(z.array(user)) } },
       },
       post: {
@@ -375,6 +423,35 @@ export const openApiDoc = {
           400: { description: "Invalid request" },
           404: { description: "No such user" },
           409: error("That would leave no admin"),
+        },
+      },
+    },
+    "/users/{id}": {
+      delete: {
+        tags: ["Users"],
+        security: bearer,
+        summary: "Delete a user (soft)",
+        description: "They can't log in, and their current session stops working at once. Their chats and audit history stay, under their name; their email is free for a new account. Not yourself, not someone with roles you don't have, and not the last admin.",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+        responses: {
+          ...needs("manage_users"),
+          200: { description: "The deleted user", content: json(user) },
+          404: { description: "No such user" },
+          409: error("Yourself, or the last admin"),
+        },
+      },
+    },
+    "/users/{id}/restore": {
+      post: {
+        tags: ["Users"],
+        security: bearer,
+        summary: "Undo a delete",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+        responses: {
+          ...needs("manage_users"),
+          200: { description: "The restored user", content: json(user) },
+          404: { description: "No deleted user with that id" },
+          409: error("Their email belongs to another user now"),
         },
       },
     },
@@ -552,6 +629,44 @@ export const openApiDoc = {
           ...needs("manage_settings"),
           200: { description: "Backends", content: json(z.array(z.object({ id: z.number().int(), name: z.string(), slug: z.string(), enabled: z.boolean() }))) },
         },
+      },
+    },
+    "/settings/sso": {
+      get: {
+        tags: ["Settings"],
+        summary: "Single sign-on providers",
+        description: "Client secrets are never returned. `redirectUri` is what to register with the provider.",
+        security: bearer,
+        responses: { ...needs("manage_settings"), 200: { description: "Providers" } },
+      },
+      post: {
+        tags: ["Settings"],
+        summary: "Add an OpenID Connect provider",
+        description: "For Google, `issuer` is `https://accounts.google.com`; for Microsoft Entra ID, `https://login.microsoftonline.com/<tenant id>/v2.0`. The issuer's discovery document is checked before saving. `allowedDomains` limits sign-in to those email domains; empty allows any (only existing users can sign in either way).",
+        security: bearer,
+        requestBody: { required: true, content: json(createSsoProviderSchema, "input") },
+        responses: {
+          ...needs("manage_settings"),
+          201: { description: "Added" },
+          400: { description: "Invalid, or the issuer's discovery document couldn't be read" },
+          409: { description: "Slug already used" },
+        },
+      },
+    },
+    "/settings/sso/{id}": {
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+      patch: {
+        tags: ["Settings"],
+        summary: "Turn a provider on or off, or change its allowed domains",
+        security: bearer,
+        requestBody: { required: true, content: json(updateSsoProviderSchema, "input") },
+        responses: { ...needs("manage_settings"), 200: { description: "Updated" }, 404: { description: "Not found" } },
+      },
+      delete: {
+        tags: ["Settings"],
+        summary: "Remove a provider (and its links to users)",
+        security: bearer,
+        responses: { ...needs("manage_settings"), 204: { description: "Removed" }, 404: { description: "Not found" } },
       },
     },
     "/settings/detection-policy": {

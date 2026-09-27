@@ -9,8 +9,9 @@ import * as usersService from "../services/users.service";
 const cantGrant = (roles: string[]) =>
   ({ error: `You can only hand out roles you have yourself, not: ${roles.join(", ")}` });
 
+// ?deleted=true includes deleted users
 export async function listUsers(c: Context<AuthEnv>) {
-  return c.json(await usersService.listUsers());
+  return c.json(await usersService.listUsers({ deleted: c.req.query("deleted") === "true" }));
 }
 
 export async function createUser(c: Context<AuthEnv>) {
@@ -65,6 +66,56 @@ export async function setUserRoles(c: Context<AuthEnv>) {
   } catch (err) {
     if (err instanceof usersService.LastAdminError) {
       return c.json({ error: err.message }, 409);
+    }
+    throw err;
+  }
+}
+
+// Soft delete. Not yourself, and not someone with roles you don't have (that
+// would be a way around the granting rule).
+export async function deleteUser(c: Context<AuthEnv>) {
+  const id = userId.safeParse(c.req.param("id"));
+  if (id.error) return c.json({ error: "User not found" }, 404);
+  if (id.data === c.get("userId")) return c.json({ error: "You can't delete yourself" }, 409);
+
+  const roles = await usersService.getRoles(id.data);
+  if (!roles) return c.json({ error: "User not found" }, 404);
+  const beyond = rolesBeyond(c.get("roles"), roles);
+  if (beyond.length) {
+    return c.json({ error: `They have roles you don't (${beyond.join(", ")}), so you can't delete them` }, 403);
+  }
+
+  try {
+    const user = await usersService.deleteUser(id.data);
+    if (!user) return c.json({ error: "User not found" }, 404);
+    await audit("user_deleted", { email: user.email });
+    return c.json(user);
+  } catch (err) {
+    if (err instanceof usersService.LastAdminError) return c.json({ error: "This is the only admin left, so they can't be deleted" }, 409);
+    throw err;
+  }
+}
+
+// Same rule as deleting: you can't bring back someone with more than you have
+export async function restoreUser(c: Context<AuthEnv>) {
+  const id = userId.safeParse(c.req.param("id"));
+  if (id.error) return c.json({ error: "User not found" }, 404);
+
+  const deleted = (await usersService.listUsers({ deleted: true })).find((u) => u.id === id.data && u.deletedAt);
+  if (!deleted) return c.json({ error: "No deleted user with that id" }, 404);
+  const beyond = rolesBeyond(c.get("roles"), deleted.roles);
+  if (beyond.length) {
+    return c.json({ error: `They have roles you don't (${beyond.join(", ")}), so you can't restore them` }, 403);
+  }
+
+  try {
+    const user = await usersService.restoreUser(id.data);
+    if (!user) return c.json({ error: "No deleted user with that id" }, 404);
+    await audit("user_restored", { email: user.email });
+    return c.json(user);
+  } catch (err) {
+    if (err instanceof usersService.EmailTakenError) {
+      return c.json({ error: `${deleted.email} belongs to another user now, so this one can't be restored` }, 409);
     }
     throw err;
   }

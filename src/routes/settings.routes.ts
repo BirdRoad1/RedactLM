@@ -8,6 +8,7 @@ import {
   updateDetectionDefaults,
   updateLlmDetector,
 } from "../controllers/settings.controller";
+import { createProvider, deleteProvider, listProviders, updateProvider } from "../controllers/sso.controller";
 import { requireRole, type AuthEnv } from "../middleware/auth";
 
 export const settingsRoutes = new Hono<AuthEnv>()
@@ -18,4 +19,8 @@ export const settingsRoutes = new Hono<AuthEnv>()
   .get("/detection-policy", getDetectionPolicy)
   .patch("/detection-policy", updateDetectionDefaults)
   .put("/detection-policy/checkers/:checker", setCheckerPolicy)
-  .delete("/detection-policy/checkers/:checker", deleteCheckerPolicy);
+  .delete("/detection-policy/checkers/:checker", deleteCheckerPolicy)
+  .get("/sso", listProviders)
+  .post("/sso", createProvider)
+  .patch("/sso/:id", updateProvider)
+  .delete("/sso/:id", deleteProvider);

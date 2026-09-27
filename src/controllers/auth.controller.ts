@@ -8,7 +8,7 @@ import { getUser, verifyCredentials } from "../services/users.service";
 
 // The caller's address; X-Forwarded-For only means something behind a proxy
 // you run, so it's recorded alongside rather than trusted
-function clientIp(c: Context) {
+export function clientIp(c: Context) {
   let remote: string | undefined;
   try {
     // "::ffff:10.0.0.5" is how IPv6 sockets show IPv4 addresses

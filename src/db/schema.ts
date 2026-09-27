@@ -19,11 +19,16 @@ export const userRoleEnum = pgEnum("user_role", userRoles);
 export const usersTable = pgTable("users", {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     username: varchar({ length: 255 }).notNull(),
-    email: varchar({ length: 255 }).notNull().unique(),
+    email: varchar({ length: 255 }).notNull(),
     passwordHash: varchar('password_hash', { length: 256 }),
     roles: userRoleEnum().array().notNull().default(sql`'{}'`),
-    createdAt: timestamp('created_at').defaultNow().notNull()
-});
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    // Soft delete: set = can't log in or use the app, but their chats and
+    // audit history keep their name. The email is free for a new account.
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+}, (t) => [
+    uniqueIndex("users_email_active_idx").on(t.email).where(sql`${t.deletedAt} is null`),
+]);
 
 export const roleEnum = pgEnum("message_role", ["system", "developer", "user", "assistant", "tool"]);
 export const actionEnum = pgEnum("message_action", ["allowed", "warned", "redacted", "blocked", "overridden", "unchecked"]);
@@ -171,4 +176,35 @@ export const keywordsTable = pgTable("keywords", {
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
     uniqueIndex("keywords_keyword_idx").on(t.keyword),
+]);
+
+// Single sign-on through OpenID Connect providers (Google, Microsoft Entra
+// ID, Okta, ...). Only users an admin already created can sign in this way:
+// the provider's verified email is matched to theirs the first time.
+export const ssoProvidersTable = pgTable("sso_providers", {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    name: varchar({ length: 64 }).notNull(),                    // on the button: "Continue with Google"
+    slug: varchar({ length: 64 }).notNull(),                    // in URLs: /auth/sso/google/start
+    issuer: text().notNull(),                                   // "https://accounts.google.com"
+    clientId: text("client_id").notNull(),
+    clientSecret: text("client_secret").notNull(),              // write-only through the API
+    allowedDomains: text("allowed_domains").array().notNull().default(sql`'{}'`), // empty = any
+    enabled: boolean().notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, (t) => [
+    uniqueIndex("sso_providers_slug_idx").on(t.slug),
+]);
+
+// Which provider account is which user, by the provider's stable id for the
+// person ("sub"), so a later email change there doesn't lose the link
+export const ssoIdentitiesTable = pgTable("sso_identities", {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    providerId: integer("provider_id").notNull().references(() => ssoProvidersTable.id, { onDelete: "cascade" }),
+    subject: text().notNull(),
+    userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    email: varchar({ length: 255 }).notNull(),                  // as the provider gave it when linked
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+    uniqueIndex("sso_identities_subject_idx").on(t.providerId, t.subject),
 ]);

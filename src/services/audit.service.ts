@@ -1,8 +1,10 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, lt, or, sql } from "drizzle-orm";
 import { tryGetContext } from "hono/context-storage";
 import { db } from "../db";
 import { roleNames } from "../auth/roles";
 import { auditLogTable, usersTable, type UserRole } from "../db/schema";
+import type { AuditFilter } from "../schema/audit.schema";
+import { csvRow } from "./csv";
 import type { AuthEnv } from "../middleware/auth";
 import type { PartialCheck, Source } from "./scan.service";
 
@@ -25,13 +27,16 @@ export type AuditEvents = {
   settings_changed: { setting: string; changes: Record<string, unknown> };
   keywords_added: { count: number };
   keywords_deleted: { count: number };
+  audit_exported: { filters: AuditFilter };
   backend_created: { name: string; slug: string; trust: string };
   backend_deleted: { name: string; slug: string };
   // entries from before roles have isAdmin instead
   user_created: { email: string; roles?: UserRole[]; isAdmin?: boolean };
   user_roles_changed: { email: string; added: UserRole[]; removed: UserRole[] };
-  login_succeeded: { email: string; ip?: string };
-  login_failed: { email: string; ip?: string };
+  user_deleted: { email: string };
+  user_restored: { email: string };
+  login_succeeded: { email: string; ip?: string; via?: string }; // via: the SSO provider, if any
+  login_failed: { email: string; ip?: string; via?: string; reason?: string };
 };
 
 export type AuditEvent = keyof AuditEvents;
@@ -124,6 +129,17 @@ export function describeEvent(event: string, details: unknown): string {
       const n = (d as AuditEvents["keywords_deleted"]).count;
       return `Removed ${number(n)} ${n === 1 ? "keyword" : "keywords"} from the keyword list.`;
     }
+    case "audit_exported": {
+      const f = (d as AuditEvents["audit_exported"]).filters;
+      const parts = [
+        f.event?.length && `events ${f.event.join(", ")}`,
+        f.user && `users matching "${f.user}"`,
+        f.conversation && `conversation ${f.conversation}`,
+        f.from && `from ${f.from}`,
+        f.to && `until ${f.to}`,
+      ].filter(Boolean);
+      return `Exported the audit log as CSV${parts.length ? ` (${parts.join("; ")})` : " (everything)"}.`;
+    }
     case "backend_created": {
       const b = d as AuditEvents["backend_created"];
       return `Added the backend "${b.name}" (${b.slug}, ${b.trust}).`;
@@ -137,6 +153,10 @@ export function describeEvent(event: string, details: unknown): string {
       const roles = u.roles ?? (u.isAdmin ? ["admin"] : []);
       return `Created the user ${u.email}${roles.length ? ` (${listRoles(roles)})` : ""}.`;
     }
+    case "user_deleted":
+      return `Deleted the user ${(d as AuditEvents["user_deleted"]).email}.`;
+    case "user_restored":
+      return `Restored the user ${(d as AuditEvents["user_restored"]).email}.`;
     case "user_roles_changed": {
       const r = d as AuditEvents["user_roles_changed"];
       const parts = [
@@ -145,30 +165,70 @@ export function describeEvent(event: string, details: unknown): string {
       ].filter(Boolean);
       return `Changed ${r.email}'s roles: ${parts.join("; ")}.`;
     }
-    case "login_succeeded":
-      return `Logged in${(d as AuditEvents["login_succeeded"]).ip ? ` from ${(d as AuditEvents["login_succeeded"]).ip}` : ""}.`;
+    case "login_succeeded": {
+      const l = d as AuditEvents["login_succeeded"];
+      return `Logged in${l.via ? ` with ${l.via}` : ""}${l.ip ? ` from ${l.ip}` : ""}.`;
+    }
     case "login_failed": {
       const l = d as AuditEvents["login_failed"];
-      return `Failed login for ${l.email}${l.ip ? ` from ${l.ip}` : ""}.`;
+      return `Failed login for ${l.email}${l.via ? ` with ${l.via}` : ""}${l.ip ? ` from ${l.ip}` : ""}${l.reason ? `: ${l.reason}` : "."}`;
     }
   }
   return event;
 }
 
-export async function listAudit({ event, limit = 200 }: { event?: string; limit?: number } = {}) {
+// `user` matches the acting user's email, or the email tried on a login
+// (failed logins have no user)
+function matching({ event, user, conversation, from, to }: AuditFilter) {
+  const like = user && `%${user.replace(/[\\%_]/g, "\\$&")}%`;
+  return and(
+    event?.length ? inArray(auditLogTable.event, event) : undefined,
+    like ? or(ilike(usersTable.email, like), ilike(sql`${auditLogTable.details}->>'email'`, like)) : undefined,
+    conversation ? eq(auditLogTable.conversationId, conversation) : undefined,
+    from ? gte(auditLogTable.createdAt, new Date(from)) : undefined,
+    to ? lt(auditLogTable.createdAt, new Date(to)) : undefined,
+  );
+}
+
+const columns = {
+  id: auditLogTable.id,
+  createdAt: auditLogTable.createdAt,
+  user: usersTable.email,
+  conversationId: auditLogTable.conversationId,
+  event: auditLogTable.event,
+  details: auditLogTable.details,
+};
+
+// Newest first. `before`: only entries older than that id, for the next page.
+export async function listAudit(filter: AuditFilter & { before?: number; limit?: number } = {}) {
   const rows = await db
-    .select({
-      id: auditLogTable.id,
-      createdAt: auditLogTable.createdAt,
-      user: usersTable.email,
-      conversationId: auditLogTable.conversationId,
-      event: auditLogTable.event,
-      details: auditLogTable.details,
-    })
+    .select(columns)
     .from(auditLogTable)
     .leftJoin(usersTable, eq(auditLogTable.userId, usersTable.id))
-    .where(and(event ? eq(auditLogTable.event, event) : undefined))
+    .where(and(matching(filter), filter.before ? lt(auditLogTable.id, filter.before) : undefined))
     .orderBy(desc(auditLogTable.id))
-    .limit(limit);
+    .limit(filter.limit ?? 200);
   return rows.map((row) => ({ ...row, summary: describeEvent(row.event, row.details) }));
+}
+
+// Every matching entry as CSV, newest first, read in batches so a long log
+// never has to fit in memory
+export function exportAuditCsv(filter: AuditFilter) {
+  const encoder = new TextEncoder();
+  let before: number | undefined;
+  let started = false;
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (!started) {
+        started = true;
+        controller.enqueue(encoder.encode(csvRow(["id", "time", "user", "event", "summary", "conversation", "details"])));
+      }
+      const rows = await listAudit({ ...filter, before, limit: 500 });
+      if (!rows.length) return controller.close();
+      before = rows[rows.length - 1]!.id;
+      controller.enqueue(encoder.encode(rows.map((r) =>
+        csvRow([r.id, r.createdAt.toISOString(), r.user, r.event, r.summary, r.conversationId, r.details]),
+      ).join("")));
+    },
+  });
 }

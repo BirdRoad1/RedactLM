@@ -37,7 +37,6 @@ import {
   type Scan,
   type Source,
 } from "../services/scan.service";
-import { getRoles } from "../services/users.service";
 import {
   UpstreamError,
   upstreamErrorResponse,
@@ -101,8 +100,7 @@ export async function createCompletion(c: Context<AuthEnv>) {
   const userId = c.get("userId");
   const userAgent = c.req.header("User-Agent") ?? null;
 
-  const roles = await getRoles(userId);
-  if (!roles) return c.json(apiError("Unauthorized", "unauthorized"), 401);
+  const roles = c.get("roles");
   // Send even if blocked (Ctrl+Enter in our web UI); only for the override role
   const override = c.req.header("X-Override-Block") === "true";
   if (override && !hasRole(roles, "override")) {

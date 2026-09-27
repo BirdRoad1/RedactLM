@@ -1,4 +1,4 @@
-import { arrayContains, asc, eq } from "drizzle-orm";
+import { and, arrayContains, asc, eq, isNotNull, isNull } from "drizzle-orm";
 import type z from "zod";
 import { db } from "../db";
 import { usersTable, type UserRole } from "../db/schema";
@@ -23,7 +23,12 @@ const publicColumns = {
   username: usersTable.username,
   roles: usersTable.roles,
   createdAt: usersTable.createdAt,
+  deletedAt: usersTable.deletedAt,
 };
+
+// Users who haven't been deleted: the only ones who can log in or act
+const active = isNull(usersTable.deletedAt);
+const isUser = (userId: number) => and(eq(usersTable.id, userId), active);
 
 export async function createUser(data: z.infer<typeof createUserSchema>) {
   try {
@@ -33,13 +38,13 @@ export async function createUser(data: z.infer<typeof createUserSchema>) {
         .values({
           email: data.email,
           username: data.username,
-          passwordHash: await Bun.password.hash(data.password),
+          passwordHash: data.password ? await Bun.password.hash(data.password) : null,
           roles: [...new Set(data.roles)],
         })
         .returning(publicColumns)
     )[0]!;
   } catch (err) {
-    // email is the only unique column
+    // email is the only unique column (among users who aren't deleted)
     if ((err as { cause?: { code?: string } })?.cause?.code === "23505") {
       throw new EmailTakenError(data.email);
     }
@@ -56,7 +61,7 @@ export async function verifyCredentials(email: string, password: string) {
   const [user] = await db
     .select({ id: usersTable.id, passwordHash: usersTable.passwordHash })
     .from(usersTable)
-    .where(eq(usersTable.email, email));
+    .where(and(eq(usersTable.email, email), active));
 
   const matches = await Bun.password.verify(
     password,
@@ -66,18 +71,31 @@ export async function verifyCredentials(email: string, password: string) {
 }
 
 export async function getUser(userId: number) {
-  const [user] = await db.select(publicColumns).from(usersTable).where(eq(usersTable.id, userId));
+  const [user] = await db.select(publicColumns).from(usersTable).where(isUser(userId));
   return user;
 }
 
-export async function listUsers() {
-  return await db.select(publicColumns).from(usersTable).orderBy(asc(usersTable.id));
+// `deleted`: include deleted users too
+export async function listUsers({ deleted = false } = {}) {
+  return await db.select(publicColumns).from(usersTable).where(deleted ? undefined : active).orderBy(asc(usersTable.id));
 }
 
-// Undefined for users that don't exist (e.g. deleted after their token was issued)
+// Undefined for users that don't exist or were deleted (e.g. after their
+// token was issued)
 export async function getRoles(userId: number) {
-  const [user] = await db.select({ roles: usersTable.roles }).from(usersTable).where(eq(usersTable.id, userId));
+  const [user] = await db.select({ roles: usersTable.roles }).from(usersTable).where(isUser(userId));
   return user?.roles;
+}
+
+// Locks every active admin, so two admins can't demote or delete each other
+// at once; throws if `userId` is the only one
+async function keepAnAdmin(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], userId: number) {
+  const admins = await tx
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(and(arrayContains(usersTable.roles, ["admin"]), active))
+    .for("update");
+  if (!admins.some((a) => a.id !== userId)) throw new LastAdminError();
 }
 
 // The user with their new roles (and what they had before), or undefined if
@@ -88,19 +106,11 @@ export async function setRoles(userId: number, roles: UserRole[]) {
     const [before] = await tx
       .select({ roles: usersTable.roles })
       .from(usersTable)
-      .where(eq(usersTable.id, userId))
+      .where(isUser(userId))
       .for("update");
     if (!before) return undefined;
 
-    if (before.roles.includes("admin") && !roles.includes("admin")) {
-      // locks every admin, so two admins can't demote each other at once
-      const admins = await tx
-        .select({ id: usersTable.id })
-        .from(usersTable)
-        .where(arrayContains(usersTable.roles, ["admin"]))
-        .for("update");
-      if (!admins.some((a) => a.id !== userId)) throw new LastAdminError();
-    }
+    if (before.roles.includes("admin") && !roles.includes("admin")) await keepAnAdmin(tx, userId);
 
     const [user] = await tx
       .update(usersTable)
@@ -109,4 +119,39 @@ export async function setRoles(userId: number, roles: UserRole[]) {
       .returning(publicColumns);
     return { user: user!, before: before.roles };
   });
+}
+
+// Soft delete: they can't log in, and their current session stops working;
+// their chats and audit history stay, under their name. Undefined if there's
+// no such (undeleted) user. Throws LastAdminError for the last admin.
+export async function deleteUser(userId: number) {
+  return await db.transaction(async (tx) => {
+    const [user] = await tx.select(publicColumns).from(usersTable).where(isUser(userId)).for("update");
+    if (!user) return undefined;
+    if (user.roles.includes("admin")) await keepAnAdmin(tx, userId);
+    const [deleted] = await tx
+      .update(usersTable)
+      .set({ deletedAt: new Date() })
+      .where(eq(usersTable.id, userId))
+      .returning(publicColumns);
+    return deleted!;
+  });
+}
+
+// Undoes a delete. Throws EmailTakenError if someone else has the email now.
+export async function restoreUser(userId: number) {
+  try {
+    const [user] = await db
+      .update(usersTable)
+      .set({ deletedAt: null })
+      .where(and(eq(usersTable.id, userId), isNotNull(usersTable.deletedAt)))
+      .returning(publicColumns);
+    return user;
+  } catch (err) {
+    if ((err as { cause?: { code?: string } })?.cause?.code === "23505") {
+      const [row] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, userId));
+      throw new EmailTakenError(row!.email);
+    }
+    throw err;
+  }
 }
