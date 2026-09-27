@@ -357,7 +357,8 @@ kbd { font: inherit; font-size: 0.85em; border: 1px solid var(--border); border-
 .audit-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.8rem; margin: 0.4rem 0 1rem; }
 .audit-filters input[type='search'] { width: 13rem; }
 .filter-chip { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.3rem 0.35rem 0.3rem 0.75rem; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); font-size: 0.85rem; }
-.filter-chip button { border: none; background: none; padding: 0 0.3rem; color: var(--muted); }
+.filter-chip button { display: grid; place-items: center; width: 1.35rem; height: 1.35rem; padding: 0; border: none; border-radius: 999px; background: none; color: var(--muted); }
+.filter-chip button:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 10%, transparent); }
 .link-button { border: none; background: none; padding: 0.35rem 0; color: var(--accent); cursor: pointer; }
 .link-button:hover { text-decoration: underline; }
 .link-button.small { font-size: 0.8rem; padding: 0; }

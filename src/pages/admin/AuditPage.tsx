@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, apiFetch } from '../../api/client'
 import type { AuditEntry } from '../../api/types'
+import { CloseIcon } from '../../components/icons'
 
 // Every kind of entry, grouped as the filter shows them, with its name here
 const CATEGORIES: { name: string; events: Record<string, string> }[] = [
@@ -179,7 +180,7 @@ export function AuditPage() {
         {filters.conversation && (
           <span className="filter-chip">
             One conversation
-            <button aria-label="Show all conversations" onClick={() => set({ conversation: '' })}>×</button>
+            <button aria-label="Show all conversations" onClick={() => set({ conversation: '' })}><CloseIcon size={14} /></button>
           </span>
         )}
         {filtered && <button className="link-button" onClick={() => setFilters(noFilters)}>Clear filters</button>}
