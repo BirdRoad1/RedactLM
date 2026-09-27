@@ -597,3 +597,9 @@ a.brand { color: inherit; text-decoration: none; }
 .arch-edge.side .arch-label { fill: var(--muted); }
 @keyframes arch-flow { to { stroke-dashoffset: -28; } }
 @media (prefers-reduced-motion: reduce) { .arch-edge path { animation: none; } }
+
+/* Backends: presets to start the form from */
+.presets { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem; }
+.presets button { border-radius: 999px; }
+.presets button.chosen { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+.preset-hint { margin: 0; }

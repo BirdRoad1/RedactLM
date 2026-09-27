@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { api } from '../../api/client'
 import type { Backend, NewBackend } from '../../api/types'
 
@@ -16,16 +16,59 @@ const empty: NewBackend = {
   extraHeaders: null,
 }
 
+// Starting points for the form. Nothing is added until the form is sent,
+// with a key where one is needed.
+type Preset = { label: string; fields: Partial<NewBackend>; headers?: string; needsKey: boolean; hint: ReactNode }
+
+const PRESETS: Preset[] = [
+  {
+    label: 'Google Gemini',
+    fields: { name: 'Google Gemini', slug: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', trust: 'cloud' },
+    needsKey: true,
+    hint: <>Get a key in <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">Google AI Studio</a>. Uses Gemini's OpenAI-compatible API.</>,
+  },
+  {
+    label: 'Anthropic Claude',
+    fields: { name: 'Claude', slug: 'claude', baseUrl: 'https://api.anthropic.com/v1', trust: 'cloud' },
+    headers: 'anthropic-version: 2023-06-01',
+    needsKey: true,
+    hint: <>Get a key in the <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">Anthropic Console</a>.</>,
+  },
+  {
+    label: 'OpenAI',
+    fields: { name: 'OpenAI', slug: 'openai', baseUrl: 'https://api.openai.com/v1', trust: 'cloud' },
+    needsKey: true,
+    hint: <>Get a key on the <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">OpenAI platform</a>.</>,
+  },
+  {
+    label: 'Ollama (local)',
+    fields: { name: 'Ollama', slug: 'ollama', baseUrl: 'http://localhost:11434/v1', trust: 'local', timeoutMs: 120_000 },
+    needsKey: false,
+    hint: <>Runs models on your own machine, no key needed. Local, so it can be the LLM detector: try <code>ollama pull gemma3</code>.</>,
+  },
+  { label: 'Custom', fields: {}, needsKey: false, hint: 'Any server with an OpenAI-compatible API.' },
+]
+
 export function BackendsPage() {
   const [backends, setBackends] = useState<Backend[]>([])
   const [form, setForm] = useState(empty)
   const [headers, setHeaders] = useState('') // "Name: value" per line
+  const [preset, setPreset] = useState<Preset | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
     api<Backend[]>('/backends').then(setBackends).catch((err) => setError(err.message))
   }, [])
   useEffect(load, [load])
+
+  // a preset's slug, or the next free one ("claude-2") if it's taken
+  function applyPreset(p: Preset) {
+    let slug = p.fields.slug ?? ''
+    for (let n = 2; slug && backends.some((b) => b.slug === slug); n++) slug = `${p.fields.slug}-${n}`
+    setPreset(p)
+    setForm({ ...empty, ...p.fields, slug })
+    setHeaders(p.headers ?? '')
+  }
 
   const set = <K extends keyof NewBackend>(key: K, value: NewBackend[K]) => setForm((f) => ({ ...f, [key]: value }))
 
@@ -46,6 +89,7 @@ export function BackendsPage() {
       })
       setForm(empty)
       setHeaders('')
+      setPreset(null)
       load()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -92,14 +136,33 @@ export function BackendsPage() {
       </table>
 
       <h2>Add a backend</h2>
+      <div className="presets" role="group" aria-label="Start from">
+        <span className="muted small">Start from</span>
+        {PRESETS.map((p) => (
+          <button key={p.label} type="button" className={preset === p ? 'chosen' : undefined} aria-pressed={preset === p} onClick={() => applyPreset(p)}>
+            {p.label}
+          </button>
+        ))}
+      </div>
       <form className="card form-grid" onSubmit={create}>
+        {preset && <p className="wide small muted preset-hint">{preset.hint}</p>}
         <label>Name<input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Local vLLM" required /></label>
         <label>
           Slug
           <input value={form.slug} onChange={(e) => set('slug', e.target.value)} placeholder="local-vllm" pattern="[a-z0-9]+(-[a-z0-9]+)*" title="lowercase letters and digits, separated by single hyphens" required />
         </label>
         <label>Base URL<input type="url" value={form.baseUrl} onChange={(e) => set('baseUrl', e.target.value)} placeholder="http://vllm:8000/v1" required /></label>
-        <label>API key<input type="password" value={form.apiKey ?? ''} onChange={(e) => set('apiKey', e.target.value)} autoComplete="off" /></label>
+        <label>
+          API key
+          <input
+            type="password"
+            value={form.apiKey ?? ''}
+            onChange={(e) => set('apiKey', e.target.value)}
+            autoComplete="off"
+            required={preset?.needsKey}
+            placeholder={preset?.needsKey ? 'Required' : 'Optional'}
+          />
+        </label>
         <label>
           Trust
           <select value={form.trust} onChange={(e) => set('trust', e.target.value as NewBackend['trust'])}>
@@ -114,7 +177,7 @@ export function BackendsPage() {
         </label>
         <label className="wide">
           Extra headers (one per line)
-          <textarea rows={2} value={headers} onChange={(e) => setHeaders(e.target.value)} placeholder="anthropic-version: 2023-06-01" />
+          <textarea rows={2} value={headers} onChange={(e) => setHeaders(e.target.value)} placeholder="Header-Name: value" />
         </label>
         <div className="checks">
           <label><input type="checkbox" checked={form.isDefault} onChange={(e) => set('isDefault', e.target.checked)} /> Default</label>
