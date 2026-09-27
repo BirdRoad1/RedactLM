@@ -25,7 +25,7 @@ export type PartialCheck = { source?: Source; checkedChars: number; totalChars: 
 
 // Something to swap for a placeholder before sending: the exact text found,
 // where (in the message text, or in a text attachment), and what it is
-export type Replacement = { value: string; start: number; end: number; title: string; source?: Source };
+export type Replacement = { value: string; start: number; end: number; title: string; checker: string; source?: Source };
 
 export type Scan = {
   scored: ScoredDetection[];
@@ -41,12 +41,13 @@ const score = (detections: Detection[], policy: Policy, editable = false) =>
 function replacementsIn(text: string, scored: ScoredDetection[], source?: Source): Replacement[] {
   const spans = scored
     .filter((s) => s.outcome === "redacted")
-    .map((s) => ({ start: s.detection.start, end: s.detection.end, title: s.detection.title }));
+    .map((s) => ({ start: s.detection.start, end: s.detection.end, title: s.detection.title, checker: s.detection.checker }));
   return mergeSpans(spans).map(({ start, end, first }) => ({
     value: text.slice(start, end),
     start,
     end,
     title: first.title,
+    checker: first.checker,
     source,
   }));
 }
@@ -74,6 +75,22 @@ export function scanStatic(text: string, policy: Policy, editable = false): Scan
 
 // A message as we check and store it: its text parts joined, plus attachments
 export type PreparedMessage = { role: Message["role"]; content: string; attachments: Attachment[] };
+
+// For messages that go out unchecked: the text and the attachments' names,
+// without reading (or refusing) any file
+export function unreadMessage(message: Message) {
+  if (typeof message.content === "string") return { role: message.role, content: message.content, filenames: [] };
+
+  const texts: string[] = [];
+  const filenames: string[] = [];
+  for (const part of message.content ?? []) {
+    if (part.type === "text") texts.push(part.text);
+    else if (part.type === "refusal") texts.push(part.refusal);
+    else if (part.type === "image_url") filenames.push(`Image ${filenames.length + 1}`);
+    else filenames.push(part.file.filename || `Attachment ${filenames.length + 1}`);
+  }
+  return { role: message.role, content: texts.join("\n\n"), filenames };
+}
 
 // Throws UnsupportedAttachmentError for attachments that can't be checked
 export function prepareMessage(message: Message): PreparedMessage {

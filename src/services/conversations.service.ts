@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNotNull, ne, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import z from "zod";
 import { redact } from "../checkers/policy";
 import { db } from "../db";
@@ -6,6 +6,7 @@ import {
   conversationsTable,
   messageDetectionsTable,
   messagesTable,
+  usersTable,
 } from "../db/schema";
 import { describeSource, type ScoredDetection } from "./scan.service";
 
@@ -76,6 +77,25 @@ export async function nextPosition(conversationId: string) {
   return (row?.max ?? -1) + 1;
 }
 
+// Placeholders of values the user chose to send as written in this conversation
+export async function getOverriddenPlaceholders(conversationId: string) {
+  const [row] = await db
+    .select({ placeholders: conversationsTable.overriddenPlaceholders })
+    .from(conversationsTable)
+    .where(eq(conversationsTable.id, conversationId));
+  return new Set(row?.placeholders ?? []);
+}
+
+export async function addOverriddenPlaceholders(conversationId: string, placeholders: string[]) {
+  if (!placeholders.length) return;
+  await db
+    .update(conversationsTable)
+    .set({
+      overriddenPlaceholders: sql`array(select distinct unnest(${conversationsTable.overriddenPlaceholders} || array[${sql.join(placeholders.map((p) => sql`${p}`), sql`, `)}]::text[]))`,
+    })
+    .where(eq(conversationsTable.id, conversationId));
+}
+
 // Moves the conversation to the top of the list, and titles it after its first
 // message that was actually sent (already masked) if it has no title yet
 export async function touchConversation(conversationId: string) {
@@ -134,4 +154,69 @@ export async function deleteConversation(userId: number, id: string) {
   if (!convo) return undefined;
   await db.delete(conversationsTable).where(eq(conversationsTable.id, id));
   return convo;
+}
+
+// For reviewers: everyone's conversations, newest first, including ones where
+// nothing was ever sent. `q` matches the owner's email or the title.
+export async function listAllConversations({ q, limit = 200 }: { q?: string; limit?: number } = {}) {
+  const like = q && `%${q.replace(/[\\%_]/g, "\\$&")}%`;
+  const flagged = (action: "blocked" | "overridden" | "unchecked") =>
+    count(sql`case when ${messagesTable.action} = ${action} then 1 end`);
+  return await db
+    .select({
+      id: conversationsTable.id,
+      title: conversationsTable.title,
+      updatedAt: conversationsTable.updatedAt,
+      user: usersTable.email,
+      blocked: flagged("blocked"),
+      overridden: flagged("overridden"),
+      unchecked: flagged("unchecked"),
+    })
+    .from(conversationsTable)
+    .innerJoin(usersTable, eq(conversationsTable.userId, usersTable.id))
+    .leftJoin(messagesTable, eq(messagesTable.conversation_id, conversationsTable.id))
+    .where(like ? or(ilike(usersTable.email, like), ilike(conversationsTable.title, like)) : undefined)
+    .groupBy(conversationsTable.id, usersTable.email)
+    .orderBy(desc(conversationsTable.updatedAt))
+    .limit(limit);
+}
+
+// For reviewers: every message as stored (masked), blocked attempts included,
+// with what was found in each (never the text itself)
+export async function reviewConversation(id: string) {
+  if (!uuid.safeParse(id).success) return undefined;
+  const [convo] = await db
+    .select({ id: conversationsTable.id, title: conversationsTable.title, updatedAt: conversationsTable.updatedAt, client: conversationsTable.client, user: usersTable.email })
+    .from(conversationsTable)
+    .innerJoin(usersTable, eq(conversationsTable.userId, usersTable.id))
+    .where(eq(conversationsTable.id, id));
+  if (!convo) return undefined;
+
+  const messages = await db
+    .select({ id: messagesTable.id, role: messagesTable.role, content: messagesTable.content, action: messagesTable.action, model: messagesTable.model, createdAt: messagesTable.created_at })
+    .from(messagesTable)
+    .where(eq(messagesTable.conversation_id, id))
+    .orderBy(asc(messagesTable.position));
+
+  const detections = messages.length
+    ? await db
+        .select({
+          messageId: messageDetectionsTable.messageId,
+          reason: messageDetectionsTable.userFacingReason,
+          location: messageDetectionsTable.location,
+          confidence: messageDetectionsTable.confidence,
+          outcome: messageDetectionsTable.outcome,
+        })
+        .from(messageDetectionsTable)
+        .where(inArray(messageDetectionsTable.messageId, messages.map((m) => m.id)))
+    : [];
+
+  return {
+    ...convo,
+    messages: messages.map(({ id, content, ...m }) => ({
+      ...m,
+      content: content ?? "",
+      detections: detections.filter((d) => d.messageId === id).map(({ messageId: _, ...d }) => d),
+    })),
+  };
 }

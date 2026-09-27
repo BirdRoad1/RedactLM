@@ -16,7 +16,8 @@ import {
   checkResponseSchema,
 } from "../schema/check.schema";
 import { updateLlmDetectorSchema } from "../schema/llm-detector.schema";
-import { createUserSchema } from "../schema/user.schema";
+import { createUserSchema, roleSchema, setRolesSchema } from "../schema/user.schema";
+import type { UserRole } from "../db/schema";
 
 // Hand-assembled OpenAPI doc for dev use. Bodies come from the real Zod
 // schemas, so those stay in sync; the paths below need updating by hand when
@@ -29,7 +30,8 @@ const json = (schema: z.ZodType, io: "input" | "output" = "output") => ({
 const error = (description: string) => ({ description, content: json(completionErrorResponse) });
 
 const unauthorized = { 401: error("Missing or invalid token") };
-const adminOnly = { ...unauthorized, 403: error("Not an admin") };
+// admins hold every role
+const needs = (role: UserRole) => ({ ...unauthorized, 403: error(`Needs the \`${role}\` role (or \`admin\`)`) });
 
 const backend = z.object({
   id: z.number().int(),
@@ -52,7 +54,7 @@ const user = z.object({
   id: z.number().int(),
   email: z.string(),
   username: z.string(),
-  isAdmin: z.boolean(),
+  roles: z.array(roleSchema),
   createdAt: z.string(),
 });
 
@@ -97,7 +99,7 @@ export const openApiDoc = {
     title: "LLM Thingy",
     version: "dev",
     description:
-      "PII-filtering proxy for OpenAI-compatible LLM backends. Create the first admin with `bun run create-admin <email> <username>`, get a token from `POST /auth/login`, then click **Authorize**. `/users` and `/backends` are admin-only.",
+      "PII-filtering proxy for OpenAI-compatible LLM backends. Create the first admin with `bun run create-admin <email> <username>`, get a token from `POST /auth/login`, then click **Authorize**. \n\nAccess is by role, and `admin` holds them all: `override` may send messages as written, neither blocked nor replaced (`X-Override-Block`), `no_check` sends without any checks (as does `admin`), `review_chats` reads everyone's conversations under `/review`, `view_audit` reads `/audit-log`, `manage_users` manages `/users` (handing out only roles they hold), `manage_backends` manages `/backends`, and `manage_settings` manages `/settings`.",
   },
   servers: [{ url: "/" }],
   components: {
@@ -223,13 +225,13 @@ export const openApiDoc = {
     "/audit-log": {
       get: {
         tags: ["Audit"],
-        summary: "Latest audit log entries (admins)",
+        summary: "Latest audit log entries",
         description:
-          "Newest first, at most 200. `summary` describes each entry in plain language; entries never contain checked text, passwords or API keys. Events: message_blocked, message_warned, message_replaced, partially_checked, attachment_refused, detector_unavailable, conversation_deleted, settings_changed, backend_created, backend_deleted, user_created, login_succeeded, login_failed.",
+          "Newest first, at most 200. `summary` describes each entry in plain language; entries never contain checked text, passwords or API keys. Events: message_blocked, message_warned, message_replaced, partially_checked, attachment_refused, detector_unavailable, conversation_deleted, settings_changed, backend_created, backend_deleted, user_created, user_roles_changed, block_overridden, sent_unchecked, conversation_reviewed, login_succeeded, login_failed.",
         security: bearer,
         parameters: [{ name: "event", in: "query", required: false, description: "Only this kind of entry", schema: { type: "string" } }],
         responses: {
-          ...adminOnly,
+          ...needs("view_audit"),
           200: {
             description: "Entries",
             content: json(z.array(z.object({
@@ -257,9 +259,16 @@ export const openApiDoc = {
             description: "Continue this conversation: only the last message is stored. Without it, a new conversation is created from all messages. The response's X-Conversation-Id header says which conversation was used.",
             schema: { type: "string", format: "uuid" },
           },
+          {
+            name: "X-Override-Block",
+            in: "header",
+            required: false,
+            description: "`true` sends the new messages as written: nothing blocks them, and in replace mode nothing in them is replaced. Later turns of the conversation keep those values as written too (only their placeholders are remembered). Needs the `override` role (403 otherwise). What was overridden is listed in `X-PII-Overridden` and recorded in the audit log.",
+            schema: { type: "string", enum: ["true"] },
+          },
         ],
         description:
-          '`model` is `"<backend slug>/<model>"`, or a bare `"<model>"` for the default backend. User messages may carry attachments as `file` parts with `file_data` (PDF, image or plain text, up to 20 MB / 50 pages) or `image_url` parts with a `data:` URL; they are read locally (OCR, plus the text stored in PDFs) and checked like text. Linked images, file ids and other file types are refused, since they cannot be checked. With `stream: true` the response is Server-Sent Events of completion chunks, ending in `data: [DONE]`.\n\nUser messages are checked against the detection policy (`/settings/detection-policy`): detections at or above `blockAt` reject the request, those at or above `warnAt` let it through and are listed in the `X-PII-Warnings` header. Stored messages have every detected span masked.',
+          '`model` is `"<backend slug>/<model>"`, or a bare `"<model>"` for the default backend. User messages may carry attachments as `file` parts with `file_data` (PDF, image or plain text, up to 20 MB / 50 pages) or `image_url` parts with a `data:` URL; they are read locally (OCR, plus the text stored in PDFs) and checked like text. Linked images, file ids and other file types are refused, since they cannot be checked. With `stream: true` the response is Server-Sent Events of completion chunks, ending in `data: [DONE]`.\n\nUser messages are checked against the detection policy (`/settings/detection-policy`): detections at or above `blockAt` reject the request, those at or above `warnAt` let it through and are listed in the `X-PII-Warnings` header. Stored messages have every detected span masked.\n\nUsers with `no_check` (and admins) skip the checks: nothing is refused or sent to the LLM detector, the send is recorded in the audit log, and stored messages are still masked by the rule-based checks. For users with `override`, blocks found only in earlier messages of a continued conversation don\'t stop it, since those got there by an override.',
         security: bearer,
         requestBody: {
           required: true,
@@ -286,6 +295,10 @@ export const openApiDoc = {
                 description: "Present when a new message or attachment was longer than the LLM detector reads (`maxChars`): it passed, but only the rule-based checks covered all of it. JSON array of `{messageIndex, source?, checkedChars, totalChars}`; also recorded in the audit log.",
                 schema: { type: "string" },
               },
+              "X-PII-Overridden": {
+                description: "Present when something in the new messages would have been blocked or replaced and went out as written (`X-Override-Block`, or a value overridden earlier in the conversation): a JSON array of `{messageIndex, title, start, end, source?}`",
+                schema: { type: "string" },
+              },
               "X-PII-Warnings": {
                 description: "Present when something reached `warnAt` but not `blockAt`: a JSON array of detections",
                 schema: { type: "string" },
@@ -304,11 +317,13 @@ export const openApiDoc = {
                   message: z.string(),
                   type: z.string(),
                   detections: z.array(flaggedDetection).optional(),
+                  overridable: z.boolean().optional().describe("Whether this user may resend with `X-Override-Block: true`"),
                 }),
               }),
             ),
           },
           503: error("The LLM detector is enabled but couldn't answer, and fails closed (`type: detector_unavailable`)"),
+          403: error("`X-Override-Block` without the `override` role"),
           404: error("No enabled backend matches the model's slug, or X-Conversation-Id isn't one of yours"),
           502: error("Backend unreachable or rejected our credentials"),
           504: error("Backend timed out"),
@@ -325,16 +340,83 @@ export const openApiDoc = {
       },
     },
     "/users": {
+      get: {
+        tags: ["Users"],
+        security: bearer,
+        summary: "List users with their roles",
+        responses: { ...needs("manage_users"), 200: { description: "Users", content: json(z.array(user)) } },
+      },
       post: {
         tags: ["Users"],
         security: bearer,
         summary: "Create a user",
+        description: "You can only give roles you hold yourself (403 otherwise).",
         requestBody: { required: true, content: json(createUserSchema, "input") },
         responses: {
-          ...adminOnly,
+          ...needs("manage_users"),
           201: { description: "Created", content: json(user) },
           400: { description: "Invalid request" },
           409: { description: "Email already taken" },
+        },
+      },
+    },
+    "/users/{id}/roles": {
+      put: {
+        tags: ["Users"],
+        security: bearer,
+        summary: "Replace a user's roles",
+        description: "Adding or removing a role both need you to hold it, so nobody can hand out more than they have. The last admin can't lose `admin`.",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+        requestBody: { required: true, content: json(setRolesSchema, "input") },
+        responses: {
+          ...needs("manage_users"),
+          200: { description: "User with their new roles", content: json(user) },
+          400: { description: "Invalid request" },
+          404: { description: "No such user" },
+          409: error("That would leave no admin"),
+        },
+      },
+    },
+    "/review/conversations": {
+      get: {
+        tags: ["Review"],
+        security: bearer,
+        summary: "Everyone's conversations, newest first",
+        description: "At most 200, including ones where every message was blocked (their title is null). Counts say how many messages were blocked, sent by overriding a block, or sent unchecked.",
+        parameters: [{ name: "q", in: "query", required: false, description: "Only conversations whose owner's email or title contains this", schema: { type: "string" } }],
+        responses: {
+          ...needs("review_chats"),
+          200: {
+            description: "Conversations",
+            content: json(z.array(z.object({
+              id: z.string(), title: z.string().nullable(), updatedAt: z.string(), user: z.string(),
+              blocked: z.number().int(), overridden: z.number().int(), unchecked: z.number().int(),
+            }))),
+          },
+        },
+      },
+    },
+    "/review/conversations/{id}": {
+      get: {
+        tags: ["Review"],
+        security: bearer,
+        summary: "Read anyone's conversation",
+        description: "Every message as stored (sensitive parts masked), blocked attempts included, each with what was found in it. Each read is recorded in the audit log.",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          ...needs("review_chats"),
+          200: {
+            description: "Conversation",
+            content: json(z.object({
+              id: z.string(), title: z.string().nullable(), updatedAt: z.string(), client: z.string().nullable(), user: z.string(),
+              messages: z.array(z.object({
+                role: z.string(), content: z.string(), model: z.string().nullable(), createdAt: z.string(),
+                action: z.enum(["allowed", "warned", "redacted", "blocked", "overridden", "unchecked"]),
+                detections: z.array(z.object({ reason: z.string(), location: z.string().nullable(), confidence: z.number(), outcome: z.string() })),
+              })),
+            })),
+          },
+          404: { description: "Not found" },
         },
       },
     },
@@ -343,7 +425,7 @@ export const openApiDoc = {
         tags: ["Backends"],
         security: bearer,
         summary: "List backends",
-        responses: { ...adminOnly, 200: { description: "Backends", content: json(z.array(backend)) } },
+        responses: { ...needs("manage_backends"), 200: { description: "Backends", content: json(z.array(backend)) } },
       },
       post: {
         tags: ["Backends"],
@@ -352,7 +434,7 @@ export const openApiDoc = {
         description: "`slug` is the model prefix: lowercase letters and digits separated by single hyphens.",
         requestBody: { required: true, content: json(createBackendSchema, "input") },
         responses: {
-          ...adminOnly,
+          ...needs("manage_backends"),
           201: { description: "Created", content: json(backend) },
           400: { description: "Invalid request" },
           409: { description: "Slug already taken" },
@@ -373,7 +455,7 @@ export const openApiDoc = {
           },
         ],
         responses: {
-          ...adminOnly,
+          ...needs("manage_backends"),
           200: { description: "Deleted backend", content: json(backend) },
           404: { description: "Not found" },
         },
@@ -384,7 +466,7 @@ export const openApiDoc = {
         tags: ["Settings"],
         summary: "Get the local-LLM PII detector settings",
         security: bearer,
-        responses: { ...adminOnly, 200: { description: "Settings", content: json(llmDetector) } },
+        responses: { ...needs("manage_settings"), 200: { description: "Settings", content: json(llmDetector) } },
       },
       patch: {
         tags: ["Settings"],
@@ -402,9 +484,21 @@ export const openApiDoc = {
           },
         },
         responses: {
-          ...adminOnly,
+          ...needs("manage_settings"),
           200: { description: "Updated settings", content: json(llmDetector) },
           400: { description: "Invalid request, unknown or non-local backend, or enabled without backend/model" },
+        },
+      },
+    },
+    "/settings/llm-detector/backends": {
+      get: {
+        tags: ["Settings"],
+        summary: "Local backends the detector can use",
+        description: "Just enough to pick one; addresses and keys stay under `/backends`.",
+        security: bearer,
+        responses: {
+          ...needs("manage_settings"),
+          200: { description: "Backends", content: json(z.array(z.object({ id: z.number().int(), name: z.string(), slug: z.string(), enabled: z.boolean() }))) },
         },
       },
     },
@@ -415,7 +509,7 @@ export const openApiDoc = {
         description:
           "`mode` says what reaching `blockAt` does: `block` stops the message; `replace` swaps what was found for a placeholder like `redacted-3f9a1c0b7e2d` and sends it, wherever that can be done cleanly (message text and plain-text files; PDFs and images still block). The same value gets the same placeholder everywhere within a conversation. Detections carry a confidence from 0 to 1. At or above `blockAt` the request is rejected; at or above `warnAt` it goes through with a warning; below both it's only recorded. `null` means never. `checkers` lists every checker with its effective thresholds; `overridden` ones don't follow the global values.",
         security: bearer,
-        responses: { ...adminOnly, 200: { description: "Policy", content: json(detectionPolicy) } },
+        responses: { ...needs("manage_settings"), 200: { description: "Policy", content: json(detectionPolicy) } },
       },
       patch: {
         tags: ["Settings"],
@@ -431,7 +525,7 @@ export const openApiDoc = {
           },
         },
         responses: {
-          ...adminOnly,
+          ...needs("manage_settings"),
           200: { description: "Updated policy", content: json(detectionPolicy) },
           400: { description: "Invalid thresholds, or warnAt above blockAt" },
         },
@@ -462,7 +556,7 @@ export const openApiDoc = {
           },
         },
         responses: {
-          ...adminOnly,
+          ...needs("manage_settings"),
           200: { description: "Updated policy", content: json(detectionPolicy) },
           400: { description: "Unknown checker or invalid thresholds" },
         },
@@ -472,7 +566,7 @@ export const openApiDoc = {
         summary: "Remove a checker's override so it follows the global thresholds",
         security: bearer,
         responses: {
-          ...adminOnly,
+          ...needs("manage_settings"),
           200: { description: "Updated policy", content: json(detectionPolicy) },
           400: { description: "Unknown checker" },
         },

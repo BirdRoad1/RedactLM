@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { hasRole, skipsChecks } from "../auth/roles";
 import {
   LlmDetectorUnavailableError,
   runLlmChecks,
@@ -17,12 +18,14 @@ import {
 } from "../services/completion-stream";
 import {
   createConversation,
+  addOverriddenPlaceholders,
+  getOverriddenPlaceholders,
   getOwnedConversation,
   nextPosition,
   saveMessage,
   touchConversation,
 } from "../services/conversations.service";
-import { audit } from "../services/audit.service";
+import { audit, type Finding } from "../services/audit.service";
 import { getPolicy } from "../services/detection-policy.service";
 import { placeholderFor, replaceInMessages } from "../checkers/replace";
 import { UnsupportedAttachmentError } from "../files/extract";
@@ -30,10 +33,11 @@ import {
   prepareMessage,
   scanMessage,
   scanStatic,
-  type PreparedMessage,
+  unreadMessage,
   type Scan,
   type Source,
 } from "../services/scan.service";
+import { getRoles } from "../services/users.service";
 import {
   UpstreamError,
   upstreamErrorResponse,
@@ -97,6 +101,16 @@ export async function createCompletion(c: Context<AuthEnv>) {
   const userId = c.get("userId");
   const userAgent = c.req.header("User-Agent") ?? null;
 
+  const roles = await getRoles(userId);
+  if (!roles) return c.json(apiError("Unauthorized", "unauthorized"), 401);
+  // Send even if blocked (Ctrl+Enter in our web UI); only for the override role
+  const override = c.req.header("X-Override-Block") === "true";
+  if (override && !hasRole(roles, "override")) {
+    return c.json(apiError("You don't have permission to send blocked messages anyway", "forbidden"), 403);
+  }
+  // no_check and admin: nothing is checked, only masked for storage
+  const unchecked = skipsChecks(roles);
+
   const json = schema.data;
 
   const resolved = await resolveModel(json.model);
@@ -127,17 +141,23 @@ export async function createCompletion(c: Context<AuthEnv>) {
   // user messages: their text and everything their attachments show
   // TODO: scan non-user messages and tool calls too
   const policy = await getPolicy();
-  let messages: PreparedMessage[];
+  let messages: ReturnType<typeof unreadMessage>[];
   let scans: (Scan | undefined)[];
   try {
-    messages = json.messages.map(prepareMessage);
-    scans = await Promise.all(
-      messages.map((message) =>
-        message.role === "user"
-          ? scanMessage(message, policy, c.req.raw.signal)
-          : undefined,
-      ),
-    );
+    if (unchecked) {
+      messages = json.messages.map(unreadMessage);
+      scans = messages.map(() => undefined);
+    } else {
+      const prepared = json.messages.map(prepareMessage);
+      scans = await Promise.all(
+        prepared.map((message) =>
+          message.role === "user"
+            ? scanMessage(message, policy, c.req.raw.signal)
+            : undefined,
+        ),
+      );
+      messages = prepared.map(({ attachments, ...m }) => ({ ...m, filenames: attachments.map((a) => a.filename) }));
+    }
   } catch (err) {
     if (err instanceof LlmDetectorUnavailableError) {
       return c.json(apiError(err.message, "detector_unavailable"), 503);
@@ -154,45 +174,94 @@ export async function createCompletion(c: Context<AuthEnv>) {
   if (!continuing) await createConversation(userId, userAgent, convo);
   let position = continuing ? await nextPosition(convo) : 0;
   const firstToSave = continuing ? messages.length - 1 : 0;
+
+  // What stops the request: a block in what's newly sent, or one in the
+  // history. For those who may override, blocked history can only have got
+  // there by an override earlier on (logged then), so it doesn't count again.
+  const stops = (i: number) => i >= firstToSave || !hasRole(roles, "override");
+  const blockedAny = scans.some((s, i) => s?.outcome === "blocked" && stops(i));
+  const overridingBlock = blockedAny && override;
+
+  // Replace mode: every value that would have blocked is swapped for its
+  // placeholder, everywhere in the text and text files, before sending.
+  // Overriding sends the values in the new messages as written instead, and
+  // later turns keep sending those as written: the model has seen them, and
+  // only their placeholders are remembered. That lasts while the user still
+  // may override.
+  const keptBefore = continuing && hasRole(roles, "override") ? await getOverriddenPlaceholders(convo) : new Set<string>();
+  const planned = scans.flatMap((scan, messageIndex) =>
+    (scan?.replacements ?? []).map((r) => ({ messageIndex, ...r, placeholder: placeholderFor(r.value, convo) })),
+  );
+  const keptValues = new Set(
+    planned
+      .filter((p) => (override && p.messageIndex >= firstToSave) || keptBefore.has(p.placeholder))
+      .map((p) => p.value),
+  );
+  const replacements = new Map<string, string>();
+  const replaced: Omit<(typeof planned)[number], "value">[] = [];
+  const kept: Omit<(typeof planned)[number], "value">[] = [];
+  for (const { value, ...p } of planned) {
+    if (keptValues.has(value)) {
+      kept.push(p);
+    } else {
+      replacements.set(value, p.placeholder);
+      replaced.push(p);
+    }
+  }
+  const keptIn = (i: number) => kept.filter((k) => k.messageIndex === i);
+
   for (const [i, message] of messages.entries()) {
     if (i < firstToSave) continue;
+    const outcome = scans[i]?.outcome ?? "ignored";
     await saveMessage(
       {
         conversation_id: convo,
         position: position++,
         role: message.role,
-        action: actionFor[scans[i]?.outcome ?? "ignored"],
+        action: unchecked && message.role === "user" ? "unchecked"
+          : (outcome === "blocked" && overridingBlock) || keptIn(i).length ? "overridden"
+          : actionFor[outcome],
         content: message.content,
         model: json.model,
       },
-      scans[i]?.scored,
-      message.attachments.map((a) => a.filename),
+      // unchecked messages are still masked for storage, by the local rules
+      unchecked
+        ? scanStatic(message.content, policy).scored.map((s) => ({ ...s, outcome: "ignored" as const }))
+        : scans[i]?.scored,
+      message.filenames,
     );
+    if (unchecked && message.role === "user") {
+      await audit("sent_unchecked", { messageIndex: i, because: roles.includes("admin") ? "admin" : "no_check" }, { conversationId: convo });
+    }
   }
   await touchConversation(convo);
   c.header("X-Conversation-Id", convo);
 
   // What was found in the newly sent messages (history was logged when it was
   // new). A blocked message is logged for what blocked it and nothing else.
-  const blockedAny = scans.some((s) => s?.outcome === "blocked");
+  // Replacements are logged as they happened: swapped, or sent as written.
   for (const [i, scan] of scans.entries()) {
     if (i < firstToSave || !scan) continue;
-    const findings = (outcome: Outcome) =>
+    const found = (outcome: Outcome) =>
       scan.scored
         .filter((s) => s.outcome === outcome)
         .map(({ detection: d, source }) => ({ title: d.title, checker: d.checker, source }));
-    const events = blockedAny
-      ? ([["message_blocked", "blocked"]] as const)
-      : ([["message_replaced", "redacted"], ["message_warned", "warned"]] as const);
-    for (const [event, outcome] of events) {
-      const found = findings(outcome);
-      if (found.length) await audit(event, { messageIndex: i, findings: found }, { conversationId: convo });
+    const asFindings = (rs: typeof kept) => rs.map(({ title, checker, source }) => ({ title, checker, source }));
+    type FindingsEvent = "message_blocked" | "block_overridden" | "message_replaced" | "message_warned";
+    const events: [FindingsEvent, Finding[]][] = blockedAny && !override
+      ? [["message_blocked", found("blocked")]]
+      : [
+          ["block_overridden", [...(overridingBlock ? found("blocked") : []), ...asFindings(keptIn(i))]],
+          ["message_replaced", asFindings(replaced.filter((r) => r.messageIndex === i))],
+          ["message_warned", found("warned")],
+        ];
+    for (const [event, findings] of events) {
+      if (findings.length) await audit(event, { messageIndex: i, findings }, { conversationId: convo });
     }
   }
 
-
-  const blocked = flagged(scans, "blocked");
-  if (blocked.length) {
+  const blocked = flagged(scans, "blocked").filter((d) => stops(d.messageIndex));
+  if (blocked.length && !overridingBlock) {
     const reasons = [...new Set(blocked.map((d) =>
       d.source ? `${d.title} in "${d.source.filename}"${d.source.page ? `, page ${d.source.page}` : ""}` : d.reason,
     ))];
@@ -202,11 +271,16 @@ export async function createCompletion(c: Context<AuthEnv>) {
           message: `Your request was blocked because it contains sensitive information:\n${reasons.map((r) => `- ${r}`).join("\n")}`,
           type: "pii_detected",
           detections: blocked,
+          overridable: hasRole(roles, "override"),
         },
-      } satisfies CompletionErrorResponse & { error: { detections: FlaggedDetection[] } },
+      } satisfies CompletionErrorResponse & { error: { detections: FlaggedDetection[]; overridable: boolean } },
       400,
     );
   }
+
+  // it's going out: remember what was sent as written, for later turns
+  const keptNew = kept.filter((k) => k.messageIndex >= firstToSave);
+  await addOverriddenPlaceholders(convo, keptNew.map((k) => k.placeholder));
 
   // Passed, but longer than the LLM detector reads. Only the newly stored
   // messages count: history comes back every turn and was already logged.
@@ -219,28 +293,21 @@ export async function createCompletion(c: Context<AuthEnv>) {
 
   // Warnings don't stop the request; clients that care (our web UI) read this header
   const warnings = flagged(scans, "warned");
+  // X-PII-Overridden: what would have blocked or been replaced in the new
+  // messages, and went out as written on the user's say-so
+  const overridden = [
+    ...(overridingBlock ? blocked.filter((d) => d.messageIndex >= firstToSave) : []),
+    ...keptNew.map(({ messageIndex, title, start, end, source }) => ({ messageIndex, title, start, end, source })),
+  ];
   // X-Partially-Checked: passed, but part of it was only covered by the rules
+  // X-PII-Replaced: what was swapped, where, and for which placeholder (never the value)
   const warningHeaders: Record<string, string> = {
     ...(warnings.length && { "X-PII-Warnings": asciiJson(warnings) }),
+    ...(overridden.length && { "X-PII-Overridden": asciiJson(overridden) }),
     ...(partial.length && { "X-Partially-Checked": asciiJson(partial) }),
+    ...(replaced.length && { "X-PII-Replaced": asciiJson(replaced) }),
   };
   for (const [name, value] of Object.entries(warningHeaders)) c.header(name, value);
-
-  // Replace mode: every value that would have blocked is swapped for its
-  // placeholder, everywhere in the text and text files, before sending
-  const replacements = new Map<string, string>();
-  const replaced = scans.flatMap((scan, messageIndex) =>
-    (scan?.replacements ?? []).map(({ value, ...r }) => {
-      const placeholder = placeholderFor(value, convo);
-      replacements.set(value, placeholder);
-      return { messageIndex, ...r, placeholder };
-    }),
-  );
-  // what was swapped, where, and for which placeholder (never the value)
-  if (replaced.length) {
-    warningHeaders["X-PII-Replaced"] = asciiJson(replaced);
-    c.header("X-PII-Replaced", warningHeaders["X-PII-Replaced"]);
-  }
 
   // Only fields the schema knows about are forwarded, so unvalidated extras
   // never leave the building

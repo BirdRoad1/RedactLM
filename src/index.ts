@@ -13,6 +13,7 @@ import { v1Routes } from "./routes/v1.routes";
 import { usersRoutes } from "./routes/users.routes";
 import { backendsRoutes } from "./routes/backends.routes";
 import { settingsRoutes } from "./routes/settings.routes";
+import { reviewRoutes } from "./routes/review.routes";
 
 const app = new Hono();
 
@@ -31,6 +32,7 @@ app.route("/users", usersRoutes);
 app.route("/backends", backendsRoutes);
 app.route("/settings", settingsRoutes);
 app.route("/audit-log", auditRoutes);
+app.route("/review", reviewRoutes);
 
 // API docs for development only
 if (env.NODE_ENV !== "production") {

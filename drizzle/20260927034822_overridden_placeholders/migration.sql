@@ -1,0 +1,1 @@
+ALTER TABLE "conversations" ADD COLUMN "overridden_placeholders" text[] DEFAULT '{}'::text[] NOT NULL;

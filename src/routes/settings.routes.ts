@@ -3,16 +3,18 @@ import {
   deleteCheckerPolicy,
   getDetectionPolicy,
   getLlmDetector,
+  listDetectorBackends,
   setCheckerPolicy,
   updateDetectionDefaults,
   updateLlmDetector,
 } from "../controllers/settings.controller";
-import { requireAdmin, type AuthEnv } from "../middleware/auth";
+import { requireRole, type AuthEnv } from "../middleware/auth";
 
 export const settingsRoutes = new Hono<AuthEnv>()
-  .use(requireAdmin)
+  .use(requireRole("manage_settings"))
   .get("/llm-detector", getLlmDetector)
   .patch("/llm-detector", updateLlmDetector)
+  .get("/llm-detector/backends", listDetectorBackends)
   .get("/detection-policy", getDetectionPolicy)
   .patch("/detection-policy", updateDetectionDefaults)
   .put("/detection-policy/checkers/:checker", setCheckerPolicy)

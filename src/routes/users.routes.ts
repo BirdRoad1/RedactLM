@@ -1,7 +1,9 @@
 import { Hono } from "hono";
-import { createUser } from "../controllers/users.controller";
-import { requireAdmin, type AuthEnv } from "../middleware/auth";
+import { createUser, listUsers, setUserRoles } from "../controllers/users.controller";
+import { requireRole, type AuthEnv } from "../middleware/auth";
 
 export const usersRoutes = new Hono<AuthEnv>()
-  .use(requireAdmin)
-  .post("/", createUser);
+  .use(requireRole("manage_users"))
+  .get("/", listUsers)
+  .post("/", createUser)
+  .put("/:id/roles", setUserRoles);

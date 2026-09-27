@@ -1,7 +1,8 @@
 import { and, desc, eq } from "drizzle-orm";
 import { tryGetContext } from "hono/context-storage";
 import { db } from "../db";
-import { auditLogTable, usersTable } from "../db/schema";
+import { roleNames } from "../auth/roles";
+import { auditLogTable, usersTable, type UserRole } from "../db/schema";
 import type { AuthEnv } from "../middleware/auth";
 import type { PartialCheck, Source } from "./scan.service";
 
@@ -14,14 +15,19 @@ export type AuditEvents = {
   message_blocked: { messageIndex: number; findings: Finding[] };
   message_warned: { messageIndex: number; findings: Finding[] };
   message_replaced: { messageIndex: number; findings: Finding[] };
+  block_overridden: { messageIndex: number; findings: Finding[] };
+  sent_unchecked: { messageIndex: number; because: "admin" | "no_check" };
   partially_checked: PartialCheck & { messageIndex: number };
   attachment_refused: { reason: string };
   detector_unavailable: { failMode: "block" | "allow"; reason: string };
   conversation_deleted: { title: string | null };
+  conversation_reviewed: { owner: string; title: string | null };
   settings_changed: { setting: string; changes: Record<string, unknown> };
   backend_created: { name: string; slug: string; trust: string };
   backend_deleted: { name: string; slug: string };
-  user_created: { email: string; isAdmin: boolean };
+  // entries from before roles have isAdmin instead
+  user_created: { email: string; roles?: UserRole[]; isAdmin?: boolean };
+  user_roles_changed: { email: string; added: UserRole[]; removed: UserRole[] };
   login_succeeded: { email: string; ip?: string };
   login_failed: { email: string; ip?: string };
 };
@@ -59,6 +65,8 @@ function listFindings(findings: Finding[]) {
   return [...counts].map(([what, n]) => (n > 1 ? `${what} (${n})` : what)).join(", ");
 }
 
+const listRoles = (roles: UserRole[]) => roles.map((r) => roleNames[r] ?? r).join(", ");
+
 function describeChanges(changes: Record<string, unknown>) {
   return Object.entries(changes)
     .map(([key, value]) => `${key} → ${value === null ? "none" : JSON.stringify(value)}`)
@@ -75,6 +83,12 @@ export function describeEvent(event: string, details: unknown): string {
       return `Message sent with warnings: ${listFindings((d as AuditEvents["message_warned"]).findings)}.`;
     case "message_replaced":
       return `Message sent with placeholders instead of: ${listFindings((d as AuditEvents["message_replaced"]).findings)}.`;
+    case "block_overridden":
+      return `Sent as written, overriding the checks: ${listFindings((d as AuditEvents["block_overridden"]).findings)}.`;
+    case "sent_unchecked":
+      return (d as AuditEvents["sent_unchecked"]).because === "admin"
+        ? "Message sent without checks (admins' messages aren't checked)."
+        : "Message sent without checks (this user's messages aren't checked).";
     case "partially_checked": {
       const p = d as AuditEvents["partially_checked"];
       const what = p.source ? `"${p.source.filename}"` : "a message";
@@ -92,6 +106,10 @@ export function describeEvent(event: string, details: unknown): string {
       const t = (d as AuditEvents["conversation_deleted"]).title;
       return t ? `Deleted the conversation "${t}".` : "Deleted a conversation.";
     }
+    case "conversation_reviewed": {
+      const r = d as AuditEvents["conversation_reviewed"];
+      return `Read ${r.owner}'s conversation${r.title ? ` "${r.title}"` : ""}.`;
+    }
     case "settings_changed": {
       const s = d as AuditEvents["settings_changed"];
       return `Changed ${s.setting}: ${describeChanges(s.changes)}.`;
@@ -106,7 +124,16 @@ export function describeEvent(event: string, details: unknown): string {
     }
     case "user_created": {
       const u = d as AuditEvents["user_created"];
-      return `Created ${u.isAdmin ? "the admin" : "the user"} ${u.email}.`;
+      const roles = u.roles ?? (u.isAdmin ? ["admin"] : []);
+      return `Created the user ${u.email}${roles.length ? ` (${listRoles(roles)})` : ""}.`;
+    }
+    case "user_roles_changed": {
+      const r = d as AuditEvents["user_roles_changed"];
+      const parts = [
+        r.added.length && `gave them ${listRoles(r.added)}`,
+        r.removed.length && `took away ${listRoles(r.removed)}`,
+      ].filter(Boolean);
+      return `Changed ${r.email}'s roles: ${parts.join("; ")}.`;
     }
     case "login_succeeded":
       return `Logged in${(d as AuditEvents["login_succeeded"]).ip ? ` from ${(d as AuditEvents["login_succeeded"]).ip}` : ""}.`;

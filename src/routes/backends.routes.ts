@@ -4,10 +4,10 @@ import {
   deleteBackend,
   listBackends,
 } from "../controllers/backends.controller";
-import { requireAdmin, type AuthEnv } from "../middleware/auth";
+import { requireRole, type AuthEnv } from "../middleware/auth";
 
 export const backendsRoutes = new Hono<AuthEnv>()
-  .use(requireAdmin)
+  .use(requireRole("manage_backends"))
   .get("/", listBackends)
   .post("/", createBackend)
   .delete("/:id", deleteBackend);

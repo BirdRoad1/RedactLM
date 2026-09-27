@@ -6,11 +6,23 @@ import {
 } from "../schema/detection-policy.schema";
 import { updateLlmDetectorSchema } from "../schema/llm-detector.schema";
 import { audit, type AuditEvents } from "../services/audit.service";
+import { listBackends } from "../services/backends.service";
 import * as detectionPolicyService from "../services/detection-policy.service";
 import * as llmDetectorService from "../services/llm-detector.service";
 
 export async function getLlmDetector(c: Context) {
   return c.json(await llmDetectorService.getLlmDetectorConfig());
+}
+
+// The backends the detector may use (local ones), without their addresses or
+// keys: choosing one doesn't need manage_backends
+export async function listDetectorBackends(c: Context) {
+  const backends = await listBackends();
+  return c.json(
+    backends
+      .filter((b) => b.trust === "local")
+      .map(({ id, name, slug, enabled }) => ({ id, name, slug, enabled })),
+  );
 }
 
 export async function updateLlmDetector(c: Context) {

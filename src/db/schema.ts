@@ -1,17 +1,31 @@
 import { sql } from "drizzle-orm";
 import { boolean, check, index, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 
+// What a user may do. "admin" includes every other role.
+export const userRoles = [
+    "admin",           // everything below, and their own messages skip the checks
+    "override",        // may send a message as written: not blocked, nothing replaced
+    "no_check",        // their messages aren't checked at all
+    "review_chats",    // may read everyone's chat history
+    "view_audit",      // may read the audit log
+    "manage_users",    // may create users and change their roles
+    "manage_backends", // may add and delete LLM backends (and see their settings)
+    "manage_settings", // may change the detection policy and LLM detector
+] as const;
+export type UserRole = (typeof userRoles)[number];
+export const userRoleEnum = pgEnum("user_role", userRoles);
+
 export const usersTable = pgTable("users", {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     username: varchar({ length: 255 }).notNull(),
     email: varchar({ length: 255 }).notNull().unique(),
     passwordHash: varchar('password_hash', { length: 256 }),
-    isAdmin: boolean('is_admin').default(false).notNull(),
+    roles: userRoleEnum().array().notNull().default(sql`'{}'`),
     createdAt: timestamp('created_at').defaultNow().notNull()
 });
 
 export const roleEnum = pgEnum("message_role", ["system", "developer", "user", "assistant", "tool"]);
-export const actionEnum = pgEnum("message_action", ["allowed", "warned", "redacted", "blocked"]);
+export const actionEnum = pgEnum("message_action", ["allowed", "warned", "redacted", "blocked", "overridden", "unchecked"]);
 
 export const conversationsTable = pgTable("conversations", {
     id: uuid().primaryKey().defaultRandom(),
@@ -20,6 +34,9 @@ export const conversationsTable = pgTable("conversations", {
         .references(() => usersTable.id, { onDelete: "restrict" }),
     client: text(), // "jan", "our-frontend", ... from User-Agent or a header
     title: text(),  // from the first message that was actually sent; null until then
+    // Placeholders (never the values) of what the user overrode replacing:
+    // those values were sent as written, so later turns send them as written too
+    overriddenPlaceholders: text("overridden_placeholders").array().notNull().default(sql`'{}'`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
         .notNull()
