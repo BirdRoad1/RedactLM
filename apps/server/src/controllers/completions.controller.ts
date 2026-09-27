@@ -39,9 +39,9 @@ import {
 } from "../services/scan.service";
 import {
   UpstreamError,
+  chatCompletionJson,
+  chatCompletionStream,
   upstreamErrorResponse,
-  upstreamJson,
-  upstreamStream,
 } from "../services/upstream.service";
 
 function apiError(message: string, type: string) {
@@ -368,7 +368,7 @@ export async function createCompletion(c: Context<AuthEnv>) {
 
   try {
     if (json.stream) {
-      const upstream = await upstreamStream(backend, "/chat/completions", init);
+      const upstream = await chatCompletionStream(backend, init);
       if (!upstream.ok || !upstream.body) {
         const error = upstreamErrorResponse(upstream.status, await upstream.text());
         return c.json(error.body, error.status);
@@ -386,7 +386,7 @@ export async function createCompletion(c: Context<AuthEnv>) {
       });
     }
 
-    const upstream = await upstreamJson(backend, "/chat/completions", init);
+    const upstream = await chatCompletionJson(backend, init);
     if (!upstream.ok) {
       const error = upstreamErrorResponse(upstream.status, upstream.text);
       return c.json(error.body, error.status);

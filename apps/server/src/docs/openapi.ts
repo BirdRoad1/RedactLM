@@ -43,6 +43,7 @@ const backend = z.object({
   name: z.string(),
   slug: z.string(),
   baseUrl: z.string(),
+  api: z.enum(["openai", "anthropic"]).describe("`openai`: OpenAI-compatible chat completions. `anthropic`: Anthropic's Messages API; requests and replies are translated, so clients still speak OpenAI's format"),
   apiKey: z.string().nullable().describe("Masked: only the last 4 characters are shown"),
   trust: z.enum(["local", "cloud"]),
   enabled: z.boolean(),
@@ -579,7 +580,7 @@ export const openApiDoc = {
         tags: ["Backends"],
         security: bearer,
         summary: "Create a backend",
-        description: "`slug` is the model prefix: lowercase letters and digits separated by single hyphens.",
+        description: "`slug` is the model prefix: lowercase letters and digits separated by single hyphens. `api` (default `openai`) is how the backend is spoken to; for `anthropic`, `baseUrl` is the API root (`https://api.anthropic.com`) and the key is sent as Anthropic expects.",
         requestBody: { required: true, content: json(createBackendSchema, "input") },
         responses: {
           ...needs("manage_backends"),

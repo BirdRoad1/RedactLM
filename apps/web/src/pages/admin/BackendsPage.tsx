@@ -6,6 +6,7 @@ const empty: NewBackend = {
   name: '',
   slug: '',
   baseUrl: '',
+  api: 'openai',
   apiKey: null,
   trust: 'cloud',
   enabled: true,
@@ -29,10 +30,9 @@ const PRESETS: Preset[] = [
   },
   {
     label: 'Anthropic Claude',
-    fields: { name: 'Claude', slug: 'claude', baseUrl: 'https://api.anthropic.com/v1', trust: 'cloud' },
-    headers: 'anthropic-version: 2023-06-01',
+    fields: { name: 'Claude', slug: 'claude', baseUrl: 'https://api.anthropic.com', api: 'anthropic', trust: 'cloud', timeoutMs: 120_000 },
     needsKey: true,
-    hint: <>Get a key in the <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">Anthropic Console</a>.</>,
+    hint: <>Get a key in the <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">Anthropic Console</a>. Uses Anthropic's own API, so PDFs and other files can be sent.</>,
   },
   {
     label: 'OpenAI',
@@ -46,8 +46,10 @@ const PRESETS: Preset[] = [
     needsKey: false,
     hint: <>Runs models on your own machine, no key needed. Local, so it can be the LLM detector: try <code>ollama pull gemma3</code>.</>,
   },
-  { label: 'Custom', fields: {}, needsKey: false, hint: 'Any server with an OpenAI-compatible API.' },
+  { label: 'Custom', fields: {}, needsKey: false, hint: "Any server with an OpenAI-compatible API, or with Anthropic's." },
 ]
+
+const API_NAMES: Record<NewBackend['api'], string> = { openai: 'OpenAI-compatible', anthropic: 'Anthropic' }
 
 export function BackendsPage() {
   const [backends, setBackends] = useState<Backend[]>([])
@@ -117,7 +119,7 @@ export function BackendsPage() {
 
       <table>
         <thead>
-          <tr><th>Name</th><th>Slug</th><th>URL</th><th>Trust</th><th>API key</th><th>Flags</th><th /></tr>
+          <tr><th>Name</th><th>Slug</th><th>URL</th><th>API</th><th>Trust</th><th>API key</th><th>Flags</th><th /></tr>
         </thead>
         <tbody>
           {backends.map((b) => (
@@ -125,13 +127,14 @@ export function BackendsPage() {
               <td>{b.name}</td>
               <td><code>{b.slug}</code></td>
               <td>{b.baseUrl}</td>
+              <td>{API_NAMES[b.api]}</td>
               <td>{b.trust}</td>
               <td>{b.apiKey ?? '—'}</td>
               <td>{[b.isDefault && 'default', !b.enabled && 'disabled', !b.supportsStreaming && 'no streaming'].filter(Boolean).join(', ')}</td>
               <td><button onClick={() => remove(b)}>Delete</button></td>
             </tr>
           ))}
-          {!backends.length && <tr><td colSpan={7} className="muted">No backends yet.</td></tr>}
+          {!backends.length && <tr><td colSpan={8} className="muted">No backends yet.</td></tr>}
         </tbody>
       </table>
 
@@ -151,7 +154,16 @@ export function BackendsPage() {
           Slug
           <input value={form.slug} onChange={(e) => set('slug', e.target.value)} placeholder="local-vllm" pattern="[a-z0-9]+(-[a-z0-9]+)*" title="lowercase letters and digits, separated by single hyphens" required />
         </label>
-        <label>Base URL<input type="url" value={form.baseUrl} onChange={(e) => set('baseUrl', e.target.value)} placeholder="http://vllm:8000/v1" required /></label>
+        <label>
+          API
+          <select value={form.api} onChange={(e) => set('api', e.target.value as NewBackend['api'])}>
+            {Object.entries(API_NAMES).map(([value, name]) => <option key={value} value={value}>{name}</option>)}
+          </select>
+        </label>
+        <label>
+          Base URL
+          <input type="url" value={form.baseUrl} onChange={(e) => set('baseUrl', e.target.value)} placeholder={form.api === 'anthropic' ? 'https://api.anthropic.com' : 'http://vllm:8000/v1'} required />
+        </label>
         <label>
           API key
           <input

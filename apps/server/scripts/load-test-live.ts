@@ -52,11 +52,12 @@ async function ensureHaikuBackend() {
   const [existing] = await db.select({ id: backendsTable.id }).from(backendsTable).where(eq(backendsTable.slug, SLUG));
   const fields = {
     name: "Claude Haiku",
-    baseUrl: "https://api.anthropic.com/v1",
+    baseUrl: "https://api.anthropic.com",
+    api: "anthropic" as const,
     apiKey: key,
     trust: "cloud" as const,
     enabled: true,
-    extraHeaders: { "anthropic-version": "2023-06-01" },
+    extraHeaders: null,
   };
   if (existing) {
     await db.update(backendsTable).set(fields).where(eq(backendsTable.id, existing.id));

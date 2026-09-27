@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import z from "zod";
 import type { ModelsList } from "../schema/models-request.schema";
 import { listEnabledBackends } from "../services/backends.service";
-import { upstreamJson } from "../services/upstream.service";
+import { listUpstreamModels } from "../services/upstream.service";
 
 // Backends don't all fill in every field, only `id` is needed. Some (like
 // Anthropic) also give a readable name.
@@ -26,7 +26,7 @@ export async function listModels(c: Context) {
   const perBackend = await Promise.all(
     backends.map(async (backend) => {
       try {
-        const res = await upstreamJson(backend, "/models", {
+        const res = await listUpstreamModels(backend, {
           signal: c.req.raw.signal,
           timeoutMs: Math.min(backend.timeoutMs, LIST_TIMEOUT_MS),
         });

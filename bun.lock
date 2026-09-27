@@ -8,6 +8,7 @@
     "apps/server": {
       "name": "@llm-thingy/server",
       "dependencies": {
+        "@anthropic-ai/sdk": "^0.128.0",
         "@hono/swagger-ui": "^0.6.1",
         "@llm-thingy/shared": "workspace:*",
         "@napi-rs/canvas": "^1.0.9",
@@ -23,7 +24,6 @@
         "zod": "^4.6.5",
       },
       "devDependencies": {
-        "@anthropic-ai/sdk": "^0.128.0",
         "@types/bun": "latest",
         "@types/jsonwebtoken": "^9.0.10",
         "@types/pg": "^8.23.1",

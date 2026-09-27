@@ -64,12 +64,16 @@ export const messagesTable = pgTable("messages", {
 ]);
 
 export const trustEnum = pgEnum("backend_trust", ["local", "cloud"]);
+// How to talk to it: OpenAI's chat completions, or Anthropic's Messages API
+// (requests and replies are translated to and from the OpenAI shape)
+export const backendApiEnum = pgEnum("backend_api", ["openai", "anthropic"]);
 
 export const backendsTable = pgTable("backends", {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     name: varchar({ length: 64 }).notNull(),                   // human-readable: "Local vLLM", "OpenAI"
     slug: varchar({ length: 64 }).notNull(),                   // model prefix: "local-vllm", "openai"
     baseUrl: text("base_url").notNull(),                       // "http://vllm:8000/v1"
+    api: backendApiEnum().notNull().default("openai"),
     apiKey: varchar("api_key", { length: 255 }),
     trust: trustEnum().notNull(),
     enabled: boolean().notNull().default(true),

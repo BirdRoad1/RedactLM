@@ -1,5 +1,7 @@
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { CompletionErrorResponse } from "../schema/completion-response.schema";
+import type { CompletionsRequest } from "../schema/completions-request.schema";
+import { anthropicJson, anthropicModels, anthropicStream } from "./anthropic.service";
 import type { Backend } from "./backends.service";
 
 export class UpstreamError extends Error {
@@ -71,6 +73,28 @@ export function upstreamJson(backend: Backend, path: string, init: UpstreamInit 
 // as it keeps producing tokens
 export function upstreamStream(backend: Backend, path: string, init: UpstreamInit) {
   return withTimeout(backend, init, (signal) => upstreamRequest(backend, path, init, signal));
+}
+
+// Chat completions and the model list, whichever API the backend speaks.
+// Anthropic backends get the request translated and answer in OpenAI's shape.
+
+export function chatCompletionJson(backend: Backend, init: UpstreamInit) {
+  if (backend.api === "anthropic") {
+    return withTimeout(backend, init, (signal) => anthropicJson(backend, init.body as CompletionsRequest, signal));
+  }
+  return upstreamJson(backend, "/chat/completions", init);
+}
+
+export function chatCompletionStream(backend: Backend, init: UpstreamInit) {
+  if (backend.api === "anthropic") {
+    return withTimeout(backend, init, (signal) => anthropicStream(backend, init.body as CompletionsRequest, signal));
+  }
+  return upstreamStream(backend, "/chat/completions", init);
+}
+
+export function listUpstreamModels(backend: Backend, init: UpstreamInit) {
+  if (backend.api === "anthropic") return withTimeout(backend, init, (signal) => anthropicModels(backend, signal));
+  return upstreamJson(backend, "/models", init);
 }
 
 // Turns a failed upstream response into something to hand back to the client.

@@ -49,11 +49,15 @@ export type PartialCheck = { checkedChars: number; totalChars: number }
 
 export type Trust = "local" | "cloud"
 
+// OpenAI-compatible chat completions, or Anthropic's Messages API
+export type BackendApi = "openai" | "anthropic"
+
 export type Backend = {
   id: number
   name: string
   slug: string
   baseUrl: string
+  api: BackendApi
   apiKey: string | null // masked, e.g. "****abcd"
   trust: Trust
   enabled: boolean

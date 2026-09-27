@@ -8,7 +8,7 @@ import {
   type LlmDetectorConfig,
 } from "../../services/llm-detector.service";
 import { audit } from "../../services/audit.service";
-import { upstreamJson } from "../../services/upstream.service";
+import { chatCompletionJson } from "../../services/upstream.service";
 import { DetectionType, type Detection, type IssueWording } from "../checker";
 
 export const CHECKER_NAME = "local-llm";
@@ -238,7 +238,7 @@ export async function runLlmChecks(text: string, signal?: AbortSignal): Promise<
 
   let res;
   try {
-    res = await upstreamJson(backend, "/chat/completions", { body, signal, timeoutMs: config.timeoutMs });
+    res = await chatCompletionJson(backend, { body, signal, timeoutMs: config.timeoutMs });
   } catch (err) {
     if (signal?.aborted) throw err;
     return unavailable(err instanceof Error ? err.message : String(err));

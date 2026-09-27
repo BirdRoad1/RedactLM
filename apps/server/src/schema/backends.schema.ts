@@ -12,6 +12,7 @@ export const createBackendSchema = z
         "Slug must be lowercase letters and digits, separated by single hyphens",
       ),
     baseUrl: z.url(),
+    api: z.enum(["openai", "anthropic"]).optional(),
     apiKey: z.string().max(255).nullish(),
     trust: z.enum(["local", "cloud"]),
     enabled: z.boolean().optional(),
