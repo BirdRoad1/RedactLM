@@ -30,6 +30,7 @@ export type SealedMessage = {
   request_id: string | null;
   model: string | null;
   action: string;
+  edit_of?: number | null;
   created_at: Date;
   detections: SealedDetection[];
 };
@@ -76,6 +77,8 @@ export function sealMessage(m: SealedMessage, previous: string | null) {
     request_id: m.request_id,
     model: m.model,
     action: m.action,
+    // only when set, so seals made before edits existed still match
+    edit_of: m.edit_of ?? undefined,
     created_at: m.created_at.toISOString(),
     detections,
   });

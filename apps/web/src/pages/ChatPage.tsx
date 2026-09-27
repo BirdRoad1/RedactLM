@@ -16,7 +16,7 @@ import { outcomeLabel } from '../components/issues'
 import { Markdown } from '../components/Markdown'
 import { MessageContent } from '../components/MessageContent'
 import { ModelPicker } from '../components/ModelPicker'
-import { PaperclipIcon } from '../components/icons'
+import { NewChatIcon, PaperclipIcon } from '../components/icons'
 import { swapsFrom, type Swaps } from '../components/placeholders'
 import { AiText } from '../components/SwappedText'
 import { useLiveCheck } from '../hooks/useLiveCheck'
@@ -35,7 +35,13 @@ type Entry = {
   overridden?: string[] // what would have been blocked or replaced, and was sent as written
   stopped?: string // for a reply: why it ended early or came back empty
   stored?: boolean
+  position?: number // where the server stored it (user messages), for editing
+  edited?: boolean // an edited version of an earlier message
 }
+
+// Editing a sent message: which one, and what was in the composer before, to
+// put back on cancel
+type Editing = { index: number; draft: string; attachments: Attachment[] }
 
 // Why a reply ended early or came back empty, in words; undefined if it
 // simply finished
@@ -129,6 +135,8 @@ export function ChatPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const fileInput = useRef<HTMLInputElement>(null)
   const [blocked, setBlocked] = useState<Blocked | null>(null)
+  const [editing, setEditing] = useState<Editing | null>(null)
+  const composer = useRef<HTMLFormElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const abort = useRef<AbortController | null>(null)
@@ -156,6 +164,7 @@ export function ChatPage() {
   useEffect(() => {
     setBlocked(null)
     setError(null)
+    setEditing(null)
     if (!id) {
       setEntries([])
       setSwaps(new Map())
@@ -172,7 +181,7 @@ export function ChatPage() {
         setEntries(
           convo.messages
             .filter((m) => m.role === 'user' || m.role === 'assistant')
-            .map((m) => ({ role: m.role as ChatMessage['role'], content: m.content, stored: true })),
+            .map((m) => ({ role: m.role as ChatMessage['role'], content: m.content, stored: true, position: m.position, edited: m.edited })),
         )
         if (convo.model) setModel(convo.model)
       })
@@ -217,13 +226,38 @@ export function ChatPage() {
     }
   }
 
+  // Loads a sent message into the composer; sending replaces it and everything
+  // after it (the server keeps the original for review)
+  function startEditing(index: number) {
+    const entry = entries[index]!
+    setEditing({ index, draft: editing ? editing.draft : draft, attachments: editing ? editing.attachments : attachments })
+    // from history, attachments are only "[Attached: …]" notes; the files
+    // themselves aren't kept, so they're left for attaching again
+    setDraft(entry.stored ? entry.content.replace(/\s*\[Attached: [^\]]+\]/g, '').trim() : entry.content)
+    setAttachments(entry.attachments ?? [])
+    setBlocked(null)
+    composer.current?.querySelector('textarea')?.focus()
+  }
+
+  function cancelEditing() {
+    if (!editing) return
+    setDraft(editing.draft)
+    setAttachments(editing.attachments)
+    setEditing(null)
+    setBlocked(null)
+  }
+
   // `override`: send even if blocked (Ctrl+Enter, for the override role)
   async function send(override = false) {
     const text = draft.trim()
     const files = attachments
     if ((!text && !files.length) || !model || busy) return
 
-    const history: Entry[] = [...entries, { role: 'user', content: text, attachments: files }]
+    // an edit replaces that message and everything after it
+    const edit = editing
+    const editOf = edit ? entries[edit.index]?.position : undefined
+    const before = edit ? entries.slice(0, edit.index) : entries
+    const history: Entry[] = [...before, { role: 'user', content: text, attachments: files, edited: !!edit }]
     setEntries([...history, { role: 'assistant', content: '' }])
     setDraft('')
     setAttachments([])
@@ -251,6 +285,12 @@ export function ChatPage() {
         model,
         messages: history.map(toMessage),
         override,
+        editOf,
+        // stored: remember where, so it can be edited, and the edit is done
+        onMessagePosition: (position) => {
+          setEntries((current) => current.map((entry, i) => (i === history.length - 1 ? { ...entry, position } : entry)))
+          if (edit) setEditing(null)
+        },
         signal: abort.current.signal,
         onDelta: appendToReply,
         onReplaced: (replaced) => setSwaps((current) => new Map([...current, ...swapsFrom(replaced, history)])),
@@ -376,7 +416,7 @@ export function ChatPage() {
             </div>
           )}
           {entries.map((entry, i) => (
-            <div key={i} className={`message ${entry.role}`}>
+            <div key={i} className={`message ${entry.role}${editing?.index === i ? ' being-edited' : ''}${editing && i > editing.index ? ' to-be-replaced' : ''}`}>
               <div className="bubble">
                 {entry.attachments && entry.attachments.length > 0 && (
                   <span className="attachments">
@@ -398,6 +438,16 @@ export function ChatPage() {
                 )}
                 {entry.role === 'assistant' && busy && i === entries.length - 1 && <span className="cursor">▍</span>}
               </div>
+              {entry.role === 'user' && (entry.edited || (entry.position !== undefined && !busy)) && (
+                <p className="message-actions small">
+                  {entry.edited && <span className="muted">Edited</span>}
+                  {entry.position !== undefined && !busy && editing?.index !== i && (
+                    <button type="button" className="link-button small edit-message" onClick={() => startEditing(i)}>
+                      <NewChatIcon size={12} /> Edit
+                    </button>
+                  )}
+                </p>
+              )}
               {entry.stopped && <p className="stopped-note">{entry.stopped}</p>}
               {entry.warnings && (
                 <p className="warning">
@@ -461,7 +511,14 @@ export function ChatPage() {
             ))}
           </div>
         )}
-        <form className="composer" onSubmit={(e) => { e.preventDefault(); send() }}>
+        {editing && (
+          <div className="editing-bar">
+            <NewChatIcon size={14} />
+            <span>Editing your message. Sending replaces it and everything after it.</span>
+            <button type="button" className="link-button small" onClick={cancelEditing}>Cancel</button>
+          </div>
+        )}
+        <form ref={composer} className="composer" onSubmit={(e) => { e.preventDefault(); send() }}>
           <input
             ref={fileInput}
             type="file"
@@ -480,6 +537,7 @@ export function ChatPage() {
             rows={1}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
+              if (e.key === 'Escape' && editing) return cancelEditing()
               if (e.key !== 'Enter' || e.shiftKey) return
               e.preventDefault()
               // Ctrl+Enter (Cmd+Enter on a Mac) sends even if blocked

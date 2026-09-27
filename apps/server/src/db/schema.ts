@@ -57,6 +57,10 @@ export const messagesTable = pgTable("messages", {
     request_id: text(),              // chatcmpl-... id of the request that added it
     model: text(),                   // for assistant messages: which model answered
     action: actionEnum().notNull().default("allowed"),
+    // An edit: the position of the (user) message this one replaces. Nothing
+    // is changed or deleted; the conversation as it stands is worked out from
+    // these (currentThread in conversations.service).
+    edit_of: integer(),
 
     created_at: timestamp({ withTimezone: true }).notNull().defaultNow(),
     // Keyed hash of this message, its detections and the previous message's

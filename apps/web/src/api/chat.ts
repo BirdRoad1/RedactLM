@@ -24,6 +24,8 @@ type ChatOptions = {
   model: string
   messages: ChatMessage[]
   override?: boolean // send even if blocked (needs the override role)
+  editOf?: number // the last message replaces the user's message stored at this position
+  onMessagePosition?: (position: number) => void // where the new message was stored, once it is
   signal?: AbortSignal
   onDelta: (text: string) => void // called with each streamed piece of the reply
   onReplaced?: (replaced: Replaced[]) => void // before the reply streams: what was swapped for placeholders
@@ -31,7 +33,7 @@ type ChatOptions = {
 
 // Streams a chat completion. Resolves with any warnings the proxy attached;
 // throws BlockedError when blocked, ApiError for other failures.
-export async function streamChat({ conversationId, onConversationId, model, messages, override, signal, onDelta, onReplaced }: ChatOptions) {
+export async function streamChat({ conversationId, onConversationId, model, messages, override, editOf, onMessagePosition, signal, onDelta, onReplaced }: ChatOptions) {
   let res: Response
   try {
     res = await apiFetch('/v1/chat/completions', {
@@ -40,6 +42,7 @@ export async function streamChat({ conversationId, onConversationId, model, mess
       headers: {
         ...(conversationId && { 'X-Conversation-Id': conversationId }),
         ...(override && { 'X-Override-Block': 'true' }),
+        ...(editOf !== undefined && { 'X-Edit-Of': String(editOf) }),
       },
       signal,
     })
@@ -59,6 +62,8 @@ export async function streamChat({ conversationId, onConversationId, model, mess
   const overridden = JSON.parse(res.headers.get('X-PII-Overridden') ?? '[]') as FlaggedDetection[]
   const savedAs = res.headers.get('X-Conversation-Id') ?? conversationId
   if (savedAs) onConversationId?.(savedAs)
+  const position = res.headers.get('X-Message-Position')
+  if (position !== null) onMessagePosition?.(Number(position))
   if (replaced.length) onReplaced?.(replaced)
 
   // Server-Sent Events: "data: {chunk}" lines, ending with "data: [DONE]".

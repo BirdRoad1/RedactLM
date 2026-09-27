@@ -241,7 +241,7 @@ mark.redacted, .mirror mark.redacted { background: var(--replace-mark); box-shad
 .event-tag.block_overridden, .event-tag.overridden, .event-tag.blocked { border-color: var(--danger); color: var(--danger); }
 .event-tag.sent_unchecked, .event-tag.unchecked, .event-tag.warned { border-color: var(--warn); color: var(--warn); }
 .event-tag.redacted { border-color: var(--replace); color: var(--replace); }
-.event-tag.user_roles_changed, .event-tag.conversation_reviewed { border-color: var(--info); color: var(--info); }
+.event-tag.user_roles_changed, .event-tag.conversation_reviewed, .event-tag.message_edited { border-color: var(--info); color: var(--info); }
 .overridden-note { color: var(--danger); font-size: 0.85rem; margin: 0.2rem 0 0; }
 .unchecked-note { color: var(--warn); font-size: 0.85rem; margin: -0.3rem 0 0; }
 .blocked-panel .override { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.5rem; }
@@ -264,6 +264,8 @@ kbd { font: inherit; font-size: 0.85em; border: 1px solid var(--border); border-
 .seal-banner.intact { color: var(--ok); border-color: var(--ok); }
 .seal-banner.unsealed { color: var(--muted); }
 .seal-banner.broken { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); font-weight: 500; }
+.message.replaced-by-edit .bubble { opacity: 0.55; }
+.message .edit-note { color: var(--info); font-style: italic; margin: 0.2rem 0 0; }
 .message .seal-broken { color: var(--danger); font-weight: 500; margin: 0.2rem 0 0; }
 .message.broken-seal .bubble { outline: 2px solid var(--danger); }
 .review-detections { margin: 0.2rem 0 0; padding-left: 1.1rem; }
@@ -303,6 +305,18 @@ kbd { font: inherit; font-size: 0.85em; border: 1px solid var(--border); border-
 .message.user .bubble mark.redacted { background: #e9dfff; box-shadow: 0 0 0 2px #e9dfff; }
 .message.user .bubble mark.warned { background: #ffe6a1; box-shadow: 0 0 0 2px #ffe6a1; }
 .message.user .bubble mark.blocked { background: #ffd4d0; box-shadow: 0 0 0 2px #ffd4d0; }
+
+/* Editing a sent message */
+.message-actions { display: flex; gap: 0.75rem; align-items: center; margin: 0.15rem 0 0; }
+.message-actions > * { display: inline-flex; align-items: center; gap: 0.3em; }
+.edit-message { color: var(--muted); opacity: 0; transition: opacity 0.15s; }
+.message:hover .edit-message, .edit-message:focus-visible { opacity: 1; }
+@media (hover: none) { .edit-message { opacity: 1; } }
+.edit-message:hover { color: var(--fg); }
+.message.being-edited .bubble { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.message.to-be-replaced { opacity: 0.45; }
+.editing-bar { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--accent); padding: 0.3rem 0.2rem; }
+.editing-bar button { margin-left: auto; }
 
 /* A reply that ended early or came back empty */
 .no-reply { font-style: italic; }

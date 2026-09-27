@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, ilike, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, or, sql } from "drizzle-orm";
 import z from "zod";
 import { redact } from "../checkers/policy";
 import { db } from "../db";
@@ -69,6 +69,7 @@ export async function saveMessage(
         request_id: message.request_id ?? null,
         model: message.model ?? null,
         action: message.action ?? "allowed",
+        edit_of: message.edit_of ?? null,
         created_at: createdAt,
         detections,
       },
@@ -96,6 +97,39 @@ export async function getOwnedConversation(userId: number, id: string) {
     .from(conversationsTable)
     .where(and(eq(conversationsTable.id, id), eq(conversationsTable.userId, userId)));
   return convo;
+}
+
+// The conversation as it stands, from messages stored in order: an edit
+// replaces the message it edits and drops everything after it. Blocked
+// attempts were never sent, so they're left out (and a blocked edit changes
+// nothing).
+export function currentThread<T extends { position: number; action: string; edit_of: number | null }>(messages: T[]): T[] {
+  const thread: T[] = [];
+  for (const message of messages) {
+    if (message.action === "blocked") continue;
+    if (message.edit_of !== null) {
+      const at = thread.findIndex((m) => m.position === message.edit_of);
+      if (at !== -1) thread.length = at;
+    }
+    thread.push(message);
+  }
+  return thread;
+}
+
+async function storedThread(conversationId: string) {
+  return currentThread(
+    await db
+      .select({ position: messagesTable.position, role: messagesTable.role, content: messagesTable.content, action: messagesTable.action, model: messagesTable.model, edit_of: messagesTable.edit_of })
+      .from(messagesTable)
+      .where(eq(messagesTable.conversation_id, conversationId))
+      .orderBy(asc(messagesTable.position)),
+  );
+}
+
+// Whether the user's message at `position` can be edited: it has to be one of
+// theirs in the conversation as it stands
+export async function canEdit(conversationId: string, position: number) {
+  return (await storedThread(conversationId)).some((m) => m.position === position && m.role === "user");
 }
 
 export async function nextPosition(conversationId: string) {
@@ -126,22 +160,14 @@ export async function addOverriddenPlaceholders(conversationId: string, placehol
 }
 
 // Moves the conversation to the top of the list, and titles it after its first
-// message that was actually sent (already masked) if it has no title yet
+// message as it stands (already masked), so editing that message retitles it.
+// Nothing sent yet (only blocked attempts): no title.
 export async function touchConversation(conversationId: string) {
-  const firstSent = db
-    .select({ text: sql`left(regexp_replace(${messagesTable.content}, ${String.raw`\s+`}, ' ', 'g'), 80)` })
-    .from(messagesTable)
-    .where(and(
-      eq(messagesTable.conversation_id, conversationId),
-      eq(messagesTable.role, "user"),
-      ne(messagesTable.action, "blocked"),
-    ))
-    .orderBy(asc(messagesTable.position))
-    .limit(1);
-
+  const first = (await storedThread(conversationId)).find((m) => m.role === "user");
+  const title = first?.content?.replace(/\s+/g, " ").slice(0, 80);
   await db
     .update(conversationsTable)
-    .set({ updatedAt: new Date(), title: sql`coalesce(${conversationsTable.title}, (${firstSent}))` })
+    .set({ updatedAt: new Date(), ...(title !== undefined && { title }) })
     .where(eq(conversationsTable.id, conversationId));
 }
 
@@ -158,16 +184,13 @@ export async function listConversations(userId: number) {
   return rows.map((row) => ({ ...row, title: row.title! }));
 }
 
-// The messages as stored (masked), without blocked attempts, which were never sent
+// The conversation as it stands (masked): without blocked attempts, which were
+// never sent, or messages replaced by an edit. `position` is what an edit names.
 export async function getConversation(userId: number, id: string) {
   const convo = await getOwnedConversation(userId, id);
   if (!convo) return undefined;
 
-  const messages = await db
-    .select({ role: messagesTable.role, content: messagesTable.content, action: messagesTable.action, model: messagesTable.model })
-    .from(messagesTable)
-    .where(and(eq(messagesTable.conversation_id, id), ne(messagesTable.action, "blocked")))
-    .orderBy(asc(messagesTable.position));
+  const messages = await storedThread(id);
 
   return {
     id: convo.id,
@@ -175,7 +198,13 @@ export async function getConversation(userId: number, id: string) {
     updatedAt: convo.updatedAt,
     // the model the user last picked (assistant rows hold the backend's own name)
     model: messages.findLast((m) => m.role === "user")?.model ?? null,
-    messages: messages.map(({ role, content, action }) => ({ role, content: content ?? "", action })),
+    messages: messages.map(({ position, role, content, action, edit_of }) => ({
+      position,
+      role,
+      content: content ?? "",
+      action,
+      edited: edit_of !== null,
+    })),
   };
 }
 
@@ -240,6 +269,7 @@ export async function reviewConversation(id: string) {
     detections.filter((d) => d.messageId === messageId).map(({ id: _, messageId: __, ...d }) => d);
 
   const seals = checkSeals(messages.map((m) => ({ ...m, detections: detectionsOf(m.id) })));
+  const standing = new Set(currentThread(messages).map((m) => m.position));
 
   return {
     ...convo,
@@ -250,6 +280,10 @@ export async function reviewConversation(id: string) {
       model: m.model,
       createdAt: m.created_at,
       seal: seals[i]!,
+      position: m.position,
+      editOf: m.edit_of,
+      // sent, then replaced by an edit (blocked attempts were never sent)
+      replaced: m.action !== "blocked" && !standing.has(m.position),
       detections: detectionsOf(m.id).map((d) => ({
         reason: d.userFacingReason,
         location: d.location,

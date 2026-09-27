@@ -260,7 +260,7 @@ export const openApiDoc = {
         tags: ["Audit"],
         summary: "Audit log entries, newest first",
         description:
-          "Newest first, `limit` at a time (200 by default, at most 2,000); pass the last id as `before` for the next page. Filters combine. `summary` describes each entry in plain language; entries never contain checked text, passwords or API keys. Events: message_blocked, message_warned, message_replaced, assistant_pii, partially_checked, attachment_refused, detector_unavailable, conversation_deleted, settings_changed, backend_created, backend_deleted, user_created, user_roles_changed, user_deleted, user_restored, user_password_changed, rate_limited, keywords_added, keywords_deleted, audit_exported, block_overridden, sent_unchecked, conversation_reviewed, login_succeeded, login_failed.",
+          "Newest first, `limit` at a time (200 by default, at most 2,000); pass the last id as `before` for the next page. Filters combine. `summary` describes each entry in plain language; entries never contain checked text, passwords or API keys. Events: message_blocked, message_warned, message_replaced, assistant_pii, partially_checked, attachment_refused, detector_unavailable, conversation_deleted, settings_changed, backend_created, backend_deleted, user_created, user_roles_changed, user_deleted, user_restored, user_password_changed, rate_limited, keywords_added, keywords_deleted, audit_exported, block_overridden, sent_unchecked, conversation_reviewed, message_edited, login_succeeded, login_failed.",
         security: bearer,
         parameters: [
           ...auditFilterParams,
@@ -318,6 +318,13 @@ export const openApiDoc = {
             description: "`true` sends the new messages as written: nothing blocks them, and in replace mode nothing in them is replaced. Later turns of the conversation keep those values as written too (only their placeholders are remembered). Needs the `override` role (403 otherwise). What was overridden is listed in `X-PII-Overridden` and recorded in the audit log.",
             schema: { type: "string", enum: ["true"] },
           },
+          {
+            name: "X-Edit-Of",
+            in: "header",
+            required: false,
+            description: "Edit: with X-Conversation-Id, the last message (a user message) replaces the user's earlier message at this position, and everything after it. Send the history up to that message, then the new version. Positions come from `GET /conversations/{id}` or the `X-Message-Position` response header. Nothing is changed or deleted: the original stays stored and reviewers see both, and the edit is recorded in the audit log. 400 if it doesn't name one of the user's messages in the conversation as it stands.",
+            schema: { type: "integer", minimum: 0 },
+          },
         ],
         description:
           '`model` is `"<backend slug>/<model>"`, or a bare `"<model>"` for the default backend. User messages may carry attachments as `file` parts with `file_data` (PDF, image or plain text, up to 20 MB / 50 pages) or `image_url` parts with a `data:` URL; they are read locally (OCR, plus the text stored in PDFs) and checked like text. Linked images, file ids and other file types are refused, since they cannot be checked. With `stream: true` the response is Server-Sent Events of completion chunks, ending in `data: [DONE]`.\n\nUser messages are checked against the detection policy (`/settings/detection-policy`): detections at or above `blockAt` reject the request, those at or above `warnAt` let it through and are listed in the `X-PII-Warnings` header. Stored messages have every detected span masked.\n\nUsers with `no_check` (and admins) skip the checks: nothing is refused or sent to the LLM detector, the send is recorded in the audit log, and stored messages are still masked by the rule-based checks. For users with `override`, blocks found only in earlier messages of a continued conversation don\'t stop it, since those got there by an override.',
@@ -339,6 +346,10 @@ export const openApiDoc = {
           200: {
             description: "Completion, or an SSE stream when `stream` is true",
             headers: {
+              "X-Message-Position": {
+                description: "Where the newest message of the request was stored in the conversation; name it in `X-Edit-Of` to edit it later",
+                schema: { type: "integer" },
+              },
               "X-PII-Replaced": {
                 description: "Present in replace mode when something was swapped for a placeholder before sending. JSON array of `{messageIndex, title, start, end, source?, placeholder}` (positions in the original text; never the value itself).",
                 schema: { type: "string" },

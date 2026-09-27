@@ -137,6 +137,9 @@ export type ReviewConversation = {
     // messages were sealed, so it can't be checked. "broken": changed since,
     // or a message before it was.
     seal: MessageSeal
+    position: number
+    editOf: number | null // an edit of the message at this position
+    replaced: boolean // sent, then replaced by a later edit
     detections: { reason: string; location: string | null; confidence: number; outcome: string }[]
   }[]
 }
@@ -149,5 +152,7 @@ export type Conversation = {
   title: string | null
   updatedAt: string
   model: string | null
-  messages: { role: ChatRole | "developer" | "tool"; content: string; action: MessageAction }[]
+  // as it stands: messages replaced by an edit aren't included.
+  // `position` is what an edit names (X-Edit-Of); `edited`: this is an edit
+  messages: { position: number; role: ChatRole | "developer" | "tool"; content: string; action: MessageAction; edited: boolean }[]
 }

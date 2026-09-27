@@ -126,9 +126,16 @@ function Transcript({ id }: { id: string }) {
           <SealBanner messages={convo.messages} />
           <div className="messages review">
             {convo.messages.map((m, i) => (
-              <div key={i} className={`message ${m.role} ${m.action}${m.seal === 'broken' ? ' broken-seal' : ''}`}>
+              <div key={i} className={`message ${m.role} ${m.action}${m.seal === 'broken' ? ' broken-seal' : ''}${m.replaced ? ' replaced-by-edit' : ''}`}>
                 <div className="bubble">{m.role === 'assistant' ? <Markdown text={m.content} /> : <MessageContent text={m.content} />}</div>
                 {m.seal === 'broken' && <p className="small seal-broken">Changed since it was saved, or a message before it was</p>}
+                {(m.replaced || m.editOf !== null) && (
+                  <p className="small edit-note">
+                    {m.editOf !== null && (m.action === 'blocked' ? 'An attempt to edit an earlier message' : 'An edit of an earlier message')}
+                    {m.editOf !== null && m.replaced && '; '}
+                    {m.replaced && (m.editOf !== null ? 'later replaced by another edit' : 'Replaced by a later edit; the AI stopped seeing it and what followed')}
+                  </p>
+                )}
                 <p className="small muted">
                   {m.role === 'user' && <span className={`event-tag ${m.action}`}>{ACTIONS[m.action]}</span>}{' '}
                   {new Date(m.createdAt).toLocaleString()}{m.model && ` · ${m.model}`}

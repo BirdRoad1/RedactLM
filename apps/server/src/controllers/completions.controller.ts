@@ -20,6 +20,7 @@ import {
   createConversation,
   addOverriddenPlaceholders,
   getOverriddenPlaceholders,
+  canEdit,
   getOwnedConversation,
   nextPosition,
   saveMessage,
@@ -151,6 +152,19 @@ export async function createCompletion(c: Context<AuthEnv>) {
     return c.json(apiError("Conversation not found", "conversation_not_found"), 404);
   }
 
+  // Editing: the newest message replaces the user's earlier message at this
+  // position (from GET /conversations/{id} or X-Message-Position), and
+  // everything after it. The original stays stored, for review.
+  const editHeader = c.req.header("X-Edit-Of");
+  let editOf: number | null = null;
+  if (editHeader !== undefined) {
+    editOf = /^\d+$/.test(editHeader) ? Number(editHeader) : NaN;
+    const last = json.messages.at(-1);
+    if (!continuing || last?.role !== "user" || !Number.isSafeInteger(editOf) || !(await canEdit(continuing, editOf))) {
+      return c.json(apiError("X-Edit-Of must name one of your messages in this conversation, and the newest message must be a user message", "invalid_request_error"), 400);
+    }
+  }
+
   // Validate everything before any detector calls or DB writes, then check
   // user messages: their text and everything their attachments show
   // TODO: scan non-user messages and tool calls too
@@ -243,6 +257,7 @@ export async function createCompletion(c: Context<AuthEnv>) {
           : actionFor[outcome],
         content: message.content,
         model: json.model,
+        edit_of: i === messages.length - 1 ? editOf : null,
       },
       // unchecked messages are still masked for storage, by the local rules
       modelText?.scored ?? scans[i]?.scored ?? storageOnly,
@@ -255,8 +270,15 @@ export async function createCompletion(c: Context<AuthEnv>) {
       await audit("sent_unchecked", { messageIndex: i, because: roles.includes("admin") ? "admin" : "no_check" }, { conversationId: convo });
     }
   }
+  // (a blocked edit is stored for review, but only logged as blocked)
+  if (editOf !== null && (!blockedAny || override)) {
+    await audit("message_edited", { messageIndex: messages.length - 1, editOf }, { conversationId: convo });
+  }
   await touchConversation(convo);
   c.header("X-Conversation-Id", convo);
+  // where the newest message was stored, so a client can edit it later
+  const messagePosition = String(position - 1);
+  c.header("X-Message-Position", messagePosition);
 
   // What was found in the newly sent messages (history was logged when it was
   // new). A blocked message is logged for what blocked it and nothing else.
@@ -382,6 +404,7 @@ export async function createCompletion(c: Context<AuthEnv>) {
           "Cache-Control": "no-cache",
           ...warningHeaders,
           "X-Conversation-Id": convo,
+          "X-Message-Position": messagePosition,
         },
       });
     }

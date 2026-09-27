@@ -27,6 +27,8 @@ export type AuditEvents = {
   detector_unavailable: { failMode: "block" | "allow"; reason: string };
   conversation_deleted: { title: string | null };
   conversation_reviewed: { owner: string; title: string | null };
+  // editOf: the position of the message it replaces, which stays stored
+  message_edited: { messageIndex: number; editOf: number };
   settings_changed: { setting: string; changes: Record<string, unknown> };
   keywords_added: { count: number };
   keywords_deleted: { count: number };
@@ -124,6 +126,8 @@ export function describeEvent(event: string, details: unknown): string {
       const t = (d as AuditEvents["conversation_deleted"]).title;
       return t ? `Deleted the conversation "${t}".` : "Deleted a conversation.";
     }
+    case "message_edited":
+      return "Edited an earlier message and sent it again. The original is kept for review.";
     case "conversation_reviewed": {
       const r = d as AuditEvents["conversation_reviewed"];
       return `Read ${r.owner}'s conversation${r.title ? ` "${r.title}"` : ""}.`;

@@ -27,6 +27,7 @@ const CATEGORIES: { name: string; events: Record<string, string> }[] = [
     events: {
       conversation_deleted: 'Conversation deleted',
       conversation_reviewed: 'Conversation reviewed',
+      message_edited: 'Message edited',
     },
   },
   {
