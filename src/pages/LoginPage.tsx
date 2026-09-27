@@ -19,7 +19,7 @@ export function LoginPage() {
     api<SignInOption[]>('/auth/sso').then(setProviders).catch(() => {})
   }, [])
 
-  if (user) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/chat" replace />
 
   async function submit(e: FormEvent) {
     e.preventDefault()

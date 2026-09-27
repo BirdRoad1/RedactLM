@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router'
+import { Link, NavLink, Outlet } from 'react-router'
 import { useAuth } from '../auth/AuthContext'
 import { hasRole } from '../auth/roles'
 
@@ -8,9 +8,9 @@ export function Layout() {
   return (
     <div className="layout">
       <header className="topbar">
-        <span className="brand">LLM Thingy</span>
+        <Link to="/" className="brand">LLM Thingy</Link>
         <nav>
-          <NavLink to="/" end>Chat</NavLink>
+          <NavLink to="/chat">Chat</NavLink>
           {hasRole(user, 'review_chats') && <NavLink to="/admin/review">Review chats</NavLink>}
           {hasRole(user, 'manage_backends') && <NavLink to="/admin/backends">Backends</NavLink>}
           {hasRole(user, 'manage_users') && <NavLink to="/admin/users">Users</NavLink>}

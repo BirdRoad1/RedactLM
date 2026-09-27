@@ -20,7 +20,7 @@ export function SsoReturnPage() {
     const expiresAt = params.get('expiresAt')
     if (token && expiresAt) {
       adopt({ token, expiresAt })
-        .then(() => navigate('/', { replace: true }))
+        .then(() => navigate('/chat', { replace: true }))
         .catch(() => navigate('/login', { replace: true, state: { ssoError: 'Signed in, but your account could not be loaded.' } }))
     } else {
       navigate('/login', { replace: true, state: { ssoError: params.get('error') ?? 'Sign-in did not complete.' } })

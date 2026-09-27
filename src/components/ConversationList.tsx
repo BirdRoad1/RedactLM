@@ -53,7 +53,7 @@ export function ConversationList({ conversations, collapsed, onToggle, onNew, on
           <ul>
             {items.map((c) => (
               <li key={c.id}>
-                <NavLink to={`/c/${c.id}`} title={c.title} onClick={onOpen}>
+                <NavLink to={`/chat/${c.id}`} title={c.title} onClick={onOpen}>
                   {c.title.replace(/\[REDACTED: ([^\]]+)\]/g, '[$1]')}
                 </NavLink>
                 <button className="delete" title="Delete conversation" aria-label="Delete conversation" onClick={() => onDelete(c)}>

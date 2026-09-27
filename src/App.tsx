@@ -13,6 +13,7 @@ import { ReviewPage } from './pages/admin/ReviewPage'
 import { SsoPage } from './pages/admin/SsoPage'
 import { UsersPage } from './pages/admin/UsersPage'
 import { ChatPage } from './pages/ChatPage'
+import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { SsoReturnPage } from './pages/SsoReturnPage'
 
@@ -25,17 +26,18 @@ function RequireUser({ children }: { children: ReactNode }) {
 
 function RequireRole({ role, children }: { role: Role; children: ReactNode }) {
   const { user } = useAuth()
-  return hasRole(user, role) ? children : <Navigate to="/" replace />
+  return hasRole(user, role) ? children : <Navigate to="/chat" replace />
 }
 
 export function App() {
   return (
     <Routes>
+      <Route index element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/sso" element={<SsoReturnPage />} />
       <Route element={<RequireUser><Layout /></RequireUser>}>
-        <Route index element={<ChatPage />} />
-        <Route path="c/:id" element={<ChatPage />} />
+        <Route path="chat" element={<ChatPage />} />
+        <Route path="chat/:id" element={<ChatPage />} />
         <Route path="admin/backends" element={<RequireRole role="manage_backends"><BackendsPage /></RequireRole>} />
         <Route path="admin/users" element={<RequireRole role="manage_users"><UsersPage /></RequireRole>} />
         <Route path="admin/policy" element={<RequireRole role="manage_settings"><PolicyPage /></RequireRole>} />

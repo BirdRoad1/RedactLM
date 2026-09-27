@@ -162,7 +162,7 @@ export function ChatPage() {
     if (!confirm(`Delete "${conversation.title}"?`)) return
     try {
       await deleteConversation(conversation.id)
-      if (conversation.id === id) navigate('/')
+      if (conversation.id === id) navigate('/chat')
       refreshList()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -222,7 +222,7 @@ export function ChatPage() {
         onConversationId: (newId) => {
           if (newId === id) return
           startedHere.current = newId
-          navigate(`/c/${newId}`)
+          navigate(`/chat/${newId}`)
         },
         model,
         messages: history.map(toMessage),
@@ -314,7 +314,7 @@ export function ChatPage() {
         collapsed={collapsed}
         onToggle={() => setCollapsed(!collapsed)}
         onNew={() => {
-          navigate('/')
+          navigate('/chat')
           closeIfNarrow()
         }}
         onOpen={closeIfNarrow}
