@@ -72,10 +72,8 @@ export function KeywordsPage() {
     <section>
       <h1>Keywords</h1>
       <p className="muted">
-        Terms your company keeps private, like project codenames, clients or internal names. Every message and
-        attachment is checked for them by the rules; they're never sent to the AI detector. Capitalization and
-        anything that isn't a letter or number are ignored: "What's up?" is saved as <code>whats up</code> and also
-        catches "WHAT'S UP!!". What a match does (block, replace or warn) is set under Detection policy, as "keyword".
+        Private terms like project codenames or client names. Messages that mention them are caught, whatever the
+        capitalization or punctuation.
       </p>
 
       <form className="card keyword-form" onSubmit={add}>

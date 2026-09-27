@@ -1,13 +1,23 @@
-import { useState, type FormEvent } from 'react'
-import { Navigate } from 'react-router'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Navigate, useLocation } from 'react-router'
+import { api, apiUrl } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
+import { EyeIcon, GoogleLogo, KeyIcon, ShieldIcon, SwapIcon } from '../components/icons'
+
+type SignInOption = { slug: string; name: string }
 
 export function LoginPage() {
   const { user, login } = useAuth()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>((location.state as { ssoError?: string } | null)?.ssoError ?? null)
   const [busy, setBusy] = useState(false)
+  const [providers, setProviders] = useState<SignInOption[]>([])
+
+  useEffect(() => {
+    api<SignInOption[]>('/auth/sso').then(setProviders).catch(() => {})
+  }, [])
 
   if (user) return <Navigate to="/" replace />
 
@@ -25,20 +35,52 @@ export function LoginPage() {
   }
 
   return (
-    <div className="login">
-      <form className="card" onSubmit={submit}>
-        <h1>LLM Thingy</h1>
-        <label>
-          Email
-          <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        </label>
-        <label>
-          Password
-          <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        </label>
-        {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={busy}>{busy ? 'Logging in…' : 'Log in'}</button>
-      </form>
+    <div className="login-page">
+      <aside className="login-brand">
+        <span className="brand">LLM Thingy</span>
+        <div className="login-pitch">
+          <h2>Use AI without leaking what matters.</h2>
+          <ul>
+            <li><ShieldIcon /> Personal data and company secrets are caught before a message leaves.</li>
+            <li><SwapIcon /> Sensitive values can be swapped for placeholders, so the answer still helps.</li>
+            <li><EyeIcon /> Every check is logged, so it's clear what happened and why.</li>
+          </ul>
+        </div>
+        <span className="login-foot">Checks run on your company's own servers.</span>
+      </aside>
+
+      <main className="login-main">
+        <div className="login-card">
+          <h1>Sign in</h1>
+          {error && <p className="error login-error" role="alert">{error}</p>}
+
+          {providers.length > 0 && (
+            <>
+              <div className="sso-buttons">
+                {providers.map((p) => (
+                  <a key={p.slug} className="sso-button" href={apiUrl(`/auth/sso/${encodeURIComponent(p.slug)}/start`)}>
+                    {/google/i.test(p.name) ? <GoogleLogo /> : <KeyIcon size={18} />}
+                    Continue with {p.name}
+                  </a>
+                ))}
+              </div>
+              <div className="login-divider"><span>or</span></div>
+            </>
+          )}
+
+          <form onSubmit={submit}>
+            <label>
+              Email
+              <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </label>
+            <label>
+              Password
+              <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </label>
+            <button type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+          </form>
+        </div>
+      </main>
     </div>
   )
 }

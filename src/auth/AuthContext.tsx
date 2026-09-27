@@ -6,6 +6,7 @@ type Auth = {
   user: Me | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
+  adopt: (session: Session) => Promise<void> // a session from single sign-on
   logout: () => void
 }
 
@@ -41,12 +42,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user, logout])
 
-  const login = useCallback(async (email: string, password: string) => {
-    setSession(await api<Session>('/auth/login', 'POST', { email, password }))
+  const adopt = useCallback(async (session: Session) => {
+    setSession(session)
     setUser(await api<Me>('/me'))
   }, [])
 
-  return <AuthContext value={{ user, loading, login, logout }}>{children}</AuthContext>
+  const login = useCallback(
+    async (email: string, password: string) => adopt(await api<Session>('/auth/login', 'POST', { email, password })),
+    [adopt],
+  )
+
+  return <AuthContext value={{ user, loading, login, adopt, logout }}>{children}</AuthContext>
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

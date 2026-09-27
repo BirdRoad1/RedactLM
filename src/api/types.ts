@@ -18,6 +18,7 @@ export type Me = {
   username: string
   roles: Role[]
   createdAt: string
+  deletedAt: string | null // set once deleted
 }
 
 export type User = Me

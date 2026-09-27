@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useState, type FormEvent } from 'react'
-import { api } from '../../api/client'
+import { api, apiFetch } from '../../api/client'
 import type { Role, User } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { hasRole, roleName, ROLES } from '../../auth/roles'
@@ -29,14 +29,16 @@ function RolePicker({ value, onChange }: { value: Role[]; onChange: (roles: Role
 }
 
 export function UsersPage() {
+  const { user: me } = useAuth()
   const [users, setUsers] = useState<User[] | null>(null)
+  const [showDeleted, setShowDeleted] = useState(false)
   const [form, setForm] = useState(empty)
   const [editing, setEditing] = useState<{ id: number; roles: Role[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
-    api<User[]>('/users').then(setUsers).catch((err) => setError(err.message))
-  }, [])
+    api<User[]>(`/users${showDeleted ? '?deleted=true' : ''}`).then(setUsers).catch((err) => setError(err.message))
+  }, [showDeleted])
   useEffect(load, [load])
 
   async function run(action: () => Promise<unknown>) {
@@ -52,7 +54,7 @@ export function UsersPage() {
   const create = (e: FormEvent) => {
     e.preventDefault()
     run(async () => {
-      await api<User>('/users', 'POST', form)
+      await api<User>('/users', 'POST', { ...form, password: form.password || undefined })
       setForm(empty)
     })
   }
@@ -63,9 +65,21 @@ export function UsersPage() {
       setEditing(null)
     })
 
+  const remove = (u: User) => {
+    if (!confirm(`Delete ${u.email}? They won't be able to log in. Their chats and history stay, and you can restore them later.`)) return
+    run(() => apiFetch(`/users/${u.id}`, { method: 'DELETE' }))
+  }
+
+  const restore = (u: User) => run(() => api(`/users/${u.id}/restore`, 'POST'))
+
   return (
     <section>
-      <h1>Users</h1>
+      <div className="page-head">
+        <h1>Users</h1>
+        <label className="toggle">
+          <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} /> Show deleted users
+        </label>
+      </div>
       {error && <p className="error">{error}</p>}
 
       {users && (
@@ -76,12 +90,22 @@ export function UsersPage() {
           <tbody>
             {users.map((u) => (
               <Fragment key={u.id}>
-                <tr>
-                  <td>{u.email}</td>
+                <tr className={u.deletedAt ? 'deleted' : undefined}>
+                  <td>
+                    {u.email}
+                    {u.deletedAt && <span className="muted small"> · deleted {new Date(u.deletedAt).toLocaleDateString()}</span>}
+                  </td>
                   <td>{u.username}</td>
                   <td>{u.roles.length ? u.roles.map(roleName).join(', ') : <span className="muted">None</span>}</td>
                   <td className="nowrap">
-                    {editing?.id !== u.id && <button onClick={() => setEditing({ id: u.id, roles: u.roles })}>Edit roles</button>}
+                    {u.deletedAt ? (
+                      <button onClick={() => restore(u)}>Restore</button>
+                    ) : (
+                      <>
+                        {editing?.id !== u.id && <button onClick={() => setEditing({ id: u.id, roles: u.roles })}>Edit roles</button>}
+                        {u.id !== me?.id && <button className="danger" onClick={() => remove(u)}>Delete</button>}
+                      </>
+                    )}
                   </td>
                 </tr>
                 {editing?.id === u.id && (
@@ -103,7 +127,10 @@ export function UsersPage() {
       <form className="card form-grid" onSubmit={create}>
         <label>Email<input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></label>
         <label>Username<input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required /></label>
-        <label>Password<input type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required /></label>
+        <label>
+          Password
+          <input type="password" autoComplete="new-password" placeholder="Leave empty for sign-in with SSO only" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        </label>
         <div className="wide">
           <RolePicker value={form.roles} onChange={(roles) => setForm({ ...form, roles })} />
         </div>

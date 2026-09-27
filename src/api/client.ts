@@ -1,6 +1,9 @@
 import type { Session } from './types'
 
 const BASE: string = import.meta.env.VITE_API_URL ?? '/api'
+
+// A full API address, for places the browser goes to directly (SSO)
+export const apiUrl = (path: string) => BASE + path
 const SESSION_KEY = 'llm-thingy.session'
 
 // Fired when the server rejects our token, so the app can go back to login

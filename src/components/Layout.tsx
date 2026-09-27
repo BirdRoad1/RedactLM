@@ -18,6 +18,7 @@ export function Layout() {
             <>
               <NavLink to="/admin/policy">Detection policy</NavLink>
               <NavLink to="/admin/detector">LLM detector</NavLink>
+              <NavLink to="/admin/sign-in">Sign-in</NavLink>
             </>
           )}
           {hasRole(user, 'manage_keywords') && <NavLink to="/admin/keywords">Keywords</NavLink>}
