@@ -12,6 +12,7 @@ const CATEGORIES: { name: string; events: Record<string, string> }[] = [
       message_replaced: 'Sent with placeholders',
       block_overridden: 'Block overridden',
       sent_unchecked: 'Sent unchecked',
+      assistant_pii: 'Personal data in AI text',
       partially_checked: 'Partly checked',
       attachment_refused: 'Attachment refused',
       detector_unavailable: 'AI detector unavailable',
@@ -44,6 +45,7 @@ const CATEGORIES: { name: string; events: Record<string, string> }[] = [
     events: {
       login_succeeded: 'Logged in',
       login_failed: 'Failed login',
+      rate_limited: 'Rate limited',
     },
   },
 ]

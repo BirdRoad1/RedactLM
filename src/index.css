@@ -645,3 +645,6 @@ a.brand { color: inherit; text-decoration: none; }
 .chat-empty p { margin: 0; }
 .chat-empty-credit { margin-top: 0.4rem !important; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #b06a12; }
 @media (prefers-color-scheme: dark) { .chat-empty-credit { color: #e8c48d; } }
+
+.event-tag.assistant_pii { border-color: var(--warn); color: var(--warn); }
+.event-tag.rate_limited { border-color: var(--danger); color: var(--danger); }
