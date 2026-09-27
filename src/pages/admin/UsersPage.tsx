@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, apiFetch } from '../../api/client'
-import type { Role, User } from '../../api/types'
+import type { Role, Session, User } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { hasRole, roleName, ROLES } from '../../auth/roles'
 
@@ -28,8 +28,13 @@ function RolePicker({ value, onChange }: { value: Role[]; onChange: (roles: Role
   )
 }
 
+// A new password for someone, typed twice
+type PasswordForm = { id: number; email: string; password: string; confirm: string }
+
 export function UsersPage() {
-  const { user: me } = useAuth()
+  const { user: me, adopt } = useAuth()
+  const [passwordFor, setPasswordFor] = useState<PasswordForm | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [users, setUsers] = useState<User[] | null>(null)
   const [showDeleted, setShowDeleted] = useState(false)
   const [form, setForm] = useState(empty)
@@ -43,6 +48,7 @@ export function UsersPage() {
 
   async function run(action: () => Promise<unknown>) {
     setError(null)
+    setNotice(null)
     try {
       await action()
       load()
@@ -72,6 +78,32 @@ export function UsersPage() {
 
   const restore = (u: User) => run(() => api(`/users/${u.id}/restore`, 'POST'))
 
+  // Setting the password of, deleting or restoring someone with roles you
+  // don't have is refused (by the server too): it'd be a way around the rule
+  // that nobody hands out more than they have
+  const outranks = (u: User) => u.roles.every((role) => hasRole(me, role))
+  const beyondYou = (action: string) => `They have roles you don't, so you can't ${action} them`
+
+  const savePassword = (e: FormEvent) => {
+    e.preventDefault()
+    const p = passwordFor!
+    if (p.password !== p.confirm) {
+      setError("The two passwords don't match.")
+      return
+    }
+    run(async () => {
+      const result = await api<{ user: User; session?: Session }>(`/users/${p.id}/password`, 'PUT', { password: p.password })
+      // your own: the old session ends with the change, so switch to the new one
+      if (result.session) await adopt(result.session)
+      setPasswordFor(null)
+      setNotice(
+        result.session
+          ? 'Your password was changed. You stay signed in here; everywhere else was signed out.'
+          : `The password for ${p.email} was changed, and they were signed out everywhere.`,
+      )
+    })
+  }
+
   return (
     <section>
       <div className="page-head">
@@ -81,6 +113,7 @@ export function UsersPage() {
         </label>
       </div>
       {error && <p className="error">{error}</p>}
+      {notice && <p className="success">{notice}</p>}
 
       {users && (
         <table>
@@ -99,15 +132,47 @@ export function UsersPage() {
                   <td>{u.roles.length ? u.roles.map(roleName).join(', ') : <span className="muted">None</span>}</td>
                   <td className="nowrap">
                     {u.deletedAt ? (
-                      <button onClick={() => restore(u)}>Restore</button>
+                      <button disabled={!outranks(u)} title={outranks(u) ? undefined : beyondYou("restore")} onClick={() => restore(u)}>Restore</button>
                     ) : (
                       <>
                         {editing?.id !== u.id && <button onClick={() => setEditing({ id: u.id, roles: u.roles })}>Edit roles</button>}
-                        {u.id !== me?.id && <button className="danger" onClick={() => remove(u)}>Delete</button>}
+                        {passwordFor?.id !== u.id && (
+                          <button
+                            disabled={!outranks(u)}
+                            title={outranks(u) ? undefined : "They have roles you don't, so you can't set their password"}
+                            onClick={() => setPasswordFor({ id: u.id, email: u.email, password: '', confirm: '' })}
+                          >
+                            Set password
+                          </button>
+                        )}
+                        {u.id !== me?.id && (
+                          <button className="danger" disabled={!outranks(u)} title={outranks(u) ? undefined : beyondYou("delete")} onClick={() => remove(u)}>
+                            Delete
+                          </button>
+                        )}
                       </>
                     )}
                   </td>
                 </tr>
+                {passwordFor?.id === u.id && (
+                  <tr>
+                    <td colSpan={4}>
+                      <form className="password-form" onSubmit={savePassword}>
+                        <label>
+                          New password
+                          <input type="password" autoComplete="new-password" minLength={8} required autoFocus value={passwordFor.password} onChange={(e) => setPasswordFor({ ...passwordFor, password: e.target.value })} />
+                        </label>
+                        <label>
+                          Again
+                          <input type="password" autoComplete="new-password" minLength={8} required value={passwordFor.confirm} onChange={(e) => setPasswordFor({ ...passwordFor, confirm: e.target.value })} />
+                        </label>
+                        <button type="submit">Set password</button>
+                        <button type="button" onClick={() => setPasswordFor(null)}>Cancel</button>
+                        <p className="small muted">At least 8 characters. {u.id === me?.id ? "You'll stay signed in here; other sessions end." : 'They\'ll be signed out everywhere.'}</p>
+                      </form>
+                    </td>
+                  </tr>
+                )}
                 {editing?.id === u.id && (
                   <tr>
                     <td colSpan={4}>
@@ -129,7 +194,7 @@ export function UsersPage() {
         <label>Username<input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required /></label>
         <label>
           Password
-          <input type="password" autoComplete="new-password" placeholder="Leave empty for sign-in with SSO only" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          <input type="password" autoComplete="new-password" placeholder="Leave empty for sign-in with SSO only" minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
         </label>
         <div className="wide">
           <RolePicker value={form.roles} onChange={(roles) => setForm({ ...form, roles })} />

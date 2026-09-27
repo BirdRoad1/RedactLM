@@ -367,7 +367,7 @@ kbd { font: inherit; font-size: 0.85em; border: 1px solid var(--border); border-
 .toggle { flex-direction: row; align-items: center; gap: 0.4rem; }
 tr.deleted td { color: var(--muted); }
 button.danger { color: var(--danger); }
-button.danger:hover { border-color: var(--danger); }
+button.danger:hover:not(:disabled) { border-color: var(--danger); }
 
 /* Login: a brand panel beside the sign-in card; stacked on phones */
 .login-page { min-height: 100vh; min-height: 100dvh; display: grid; grid-template-columns: minmax(320px, 5fr) 7fr; }
@@ -660,3 +660,8 @@ a.review-link:hover, a.review-link:focus-visible { text-decoration: underline; }
 tr:has(> td > a.review-link):hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
 .audit-filters .limit-input { width: 6rem; }
 .audit-filters .limit-hint { align-self: center; margin-left: -0.4rem; padding-top: 1.2rem; }
+
+/* Users: setting someone's password */
+.password-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.6rem 0.8rem; }
+.password-form input { width: 14rem; }
+.password-form p { flex-basis: 100%; margin: 0; }
