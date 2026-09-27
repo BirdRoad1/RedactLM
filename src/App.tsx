@@ -7,6 +7,7 @@ import { Layout } from './components/Layout'
 import { AuditPage } from './pages/admin/AuditPage'
 import { BackendsPage } from './pages/admin/BackendsPage'
 import { DetectorPage } from './pages/admin/DetectorPage'
+import { KeywordsPage } from './pages/admin/KeywordsPage'
 import { PolicyPage } from './pages/admin/PolicyPage'
 import { ReviewPage } from './pages/admin/ReviewPage'
 import { UsersPage } from './pages/admin/UsersPage'
@@ -36,6 +37,7 @@ export function App() {
         <Route path="admin/users" element={<RequireRole role="manage_users"><UsersPage /></RequireRole>} />
         <Route path="admin/policy" element={<RequireRole role="manage_settings"><PolicyPage /></RequireRole>} />
         <Route path="admin/detector" element={<RequireRole role="manage_settings"><DetectorPage /></RequireRole>} />
+        <Route path="admin/keywords" element={<RequireRole role="manage_keywords"><KeywordsPage /></RequireRole>} />
         <Route path="admin/audit" element={<RequireRole role="view_audit"><AuditPage /></RequireRole>} />
         <Route path="admin/review" element={<RequireRole role="review_chats"><ReviewPage /></RequireRole>} />
         <Route path="admin/review/:id" element={<RequireRole role="review_chats"><ReviewPage /></RequireRole>} />

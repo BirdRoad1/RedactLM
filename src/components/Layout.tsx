@@ -20,6 +20,7 @@ export function Layout() {
               <NavLink to="/admin/detector">LLM detector</NavLink>
             </>
           )}
+          {hasRole(user, 'manage_keywords') && <NavLink to="/admin/keywords">Keywords</NavLink>}
           {hasRole(user, 'view_audit') && <NavLink to="/admin/audit">Audit log</NavLink>}
         </nav>
         <span className="spacer" />

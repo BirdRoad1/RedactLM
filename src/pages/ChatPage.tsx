@@ -12,6 +12,7 @@ import { CheckedTextarea } from '../components/CheckedTextarea'
 import { ConversationList } from '../components/ConversationList'
 import { HighlightedText } from '../components/HighlightedText'
 import { outcomeLabel } from '../components/issues'
+import { Markdown } from '../components/Markdown'
 import { MessageContent } from '../components/MessageContent'
 import { PaperclipIcon } from '../components/icons'
 import { useLiveCheck } from '../hooks/useLiveCheck'
@@ -322,7 +323,7 @@ export function ChatPage() {
         <div className="chat-toolbar">
           <select value={model} onChange={(e) => setModel(e.target.value)}>
             {models.map((m) => (
-              <option key={m.id} value={m.id}>{m.id}</option>
+              <option key={m.id} value={m.id}>{m.name} · {m.backend}</option>
             ))}
           </select>
         </div>
@@ -343,7 +344,9 @@ export function ChatPage() {
                     {entry.attachments.map((a) => <span key={a.id} className="attachment-ref"><PaperclipIcon size={13} /> {a.filename}</span>)}
                   </span>
                 )}
-                {entry.stored ? (
+                {entry.role === 'assistant' ? (
+                  <Markdown text={entry.content} />
+                ) : entry.stored ? (
                   <MessageContent text={entry.content} />
                 ) : entry.warnings || entry.replaced ? (
                   <HighlightedText text={entry.content} issues={[...(entry.warnings ?? []), ...(entry.replaced ?? [])]} />

@@ -10,6 +10,7 @@ export type Role =
   | 'manage_users'
   | 'manage_backends'
   | 'manage_settings'
+  | 'manage_keywords'
 
 export type Me = {
   id: number
@@ -23,7 +24,9 @@ export type User = Me
 
 export type Session = { token: string; expiresAt: string }
 
-export type Model = { id: string; owned_by: string }
+// `id` is what's sent; `name` is readable when the backend gives one, else
+// the model's own id; `backend` is the backend's name
+export type Model = { id: string; owned_by: string; name: string; backend: string }
 
 export type ChatRole = 'system' | 'user' | 'assistant'
 
@@ -123,6 +126,11 @@ export type AuditEntry = {
   event: string
   summary: string // plain-language description
 }
+
+// A custom keyword, as saved (lowercase, letters and numbers only)
+export type Keyword = { id: number; keyword: string; createdAt: string; createdBy: string | null }
+
+export type AddKeywordsResult = { added: string[]; alreadyListed: string[]; empty: string[] }
 
 export type ConversationSummary = { id: string; title: string; updatedAt: string }
 

@@ -15,6 +15,8 @@ const EVENTS: Record<string, string> = {
   conversation_deleted: 'Conversation deleted',
   conversation_reviewed: 'Conversation reviewed',
   settings_changed: 'Settings changed',
+  keywords_added: 'Keywords added',
+  keywords_deleted: 'Keywords removed',
   backend_created: 'Backend added',
   backend_deleted: 'Backend deleted',
   user_created: 'User created',

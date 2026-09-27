@@ -14,6 +14,7 @@ export const ROLES: { role: Role; name: string; description: string }[] = [
   { role: 'manage_users', name: 'Manages users', description: 'May create users and hand out roles they have themselves.' },
   { role: 'manage_backends', name: 'Manages backends', description: 'May add and delete LLM backends.' },
   { role: 'manage_settings', name: 'Manages detection settings', description: 'May change the detection policy and the LLM detector.' },
+  { role: 'manage_keywords', name: 'Manages keywords', description: 'May see and change the list of private keywords.' },
 ]
 
 export const roleName = (role: Role) => ROLES.find((r) => r.role === role)?.name ?? role

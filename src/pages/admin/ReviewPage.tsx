@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api } from '../../api/client'
 import type { MessageAction, ReviewConversation, ReviewSummary } from '../../api/types'
+import { Markdown } from '../../components/Markdown'
 import { MessageContent } from '../../components/MessageContent'
 
 // How each stored message went, in words
@@ -97,7 +98,7 @@ function Transcript({ id }: { id: string }) {
           <div className="messages review">
             {convo.messages.map((m, i) => (
               <div key={i} className={`message ${m.role} ${m.action}`}>
-                <div className="bubble"><MessageContent text={m.content} /></div>
+                <div className="bubble">{m.role === 'assistant' ? <Markdown text={m.content} /> : <MessageContent text={m.content} />}</div>
                 <p className="small muted">
                   {m.role === 'user' && <span className={`event-tag ${m.action}`}>{ACTIONS[m.action]}</span>}{' '}
                   {new Date(m.createdAt).toLocaleString()}{m.model && ` · ${m.model}`}
