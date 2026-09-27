@@ -1,11 +1,13 @@
-# LLM Thingy: Postgres, the API and the web UI.
+# LLM Thingy: the app (API and web UI in one container) and Postgres.
 #
 #   cp .env.example .env     then set JWT_SECRET (and POSTGRES_PASSWORD)
 #   docker compose up -d --build
-#   docker compose exec -it api bun run create-admin you@example.com you
+#   docker compose exec -it app bun run create-admin you@example.com you
 #
-# Then open http://localhost:8080 (or APP_URL). Add a local model for the
-# LLM detector with:  docker compose --profile local-ai up -d
+# Then open http://localhost:8080 (or APP_URL). OpenAI-style clients use
+# http://localhost:8080/v1. For HTTPS, put a reverse proxy (e.g. Caddy) in
+# front and set TRUST_PROXY=true. Add a local model for the LLM detector with:
+#   docker compose --profile local-ai up -d
 # and the "Ollama (local)" backend preset, with http://ollama:11434/v1 as its URL.
 
 services:
@@ -23,12 +25,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    # not published: only the API talks to it
+    # not published: only the app talks to it
 
-  api:
+  app:
     build: .
     restart: unless-stopped
-    # only what the API needs; nothing else from .env reaches it
+    ports:
+      - "${PORT:-8080}:3000"
+    # only what the app needs; nothing else from .env reaches it
     environment:
       DATABASE_URL: postgres://llm_thingy:${POSTGRES_PASSWORD:-llm-thingy}@db:5432/llm_thingy
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (e.g. openssl rand -base64 48)}
@@ -36,22 +40,13 @@ services:
       # where people open the app; single sign-on sends them back here
       APP_URL: ${APP_URL:-http://localhost:8080}
       OCR_WORKERS: ${OCR_WORKERS:-2}
-      # requests arrive through the web container's nginx, which records
-      # the real client address in X-Forwarded-For
-      TRUST_PROXY: "true"
+      # true only behind a reverse proxy you run, which records the client's
+      # address in X-Forwarded-For
+      TRUST_PROXY: ${TRUST_PROXY:-false}
       # scales every rate limit; 0 turns them off
       RATE_LIMIT_MULTIPLIER: ${RATE_LIMIT_MULTIPLIER:-1}
     depends_on:
       db:
-        condition: service_healthy
-
-  web:
-    build: ./llm-thingy-web
-    restart: unless-stopped
-    ports:
-      - "${PORT:-8080}:80"
-    depends_on:
-      api:
         condition: service_healthy
 
   # Optional local model (e.g. Gemma) for the LLM detector

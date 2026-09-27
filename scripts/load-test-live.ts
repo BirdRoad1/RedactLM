@@ -240,7 +240,7 @@ async function cleanUp() {
 }
 
 try {
-  const alive = await fetch(`${BASE}/`).catch(() => undefined);
+  const alive = await fetch(`${BASE}/health`).catch(() => undefined);
   if (!alive?.ok) throw new Error(`No server answering at ${BASE}; start it first (bun run dev)`);
 
   console.log(`Claude Haiku backend "${SLUG}": ${await ensureHaikuBackend()}`);

@@ -3,7 +3,12 @@
 .env.*
 .git
 node_modules
-llm-thingy-web
 tests
 *.log
 coverage
+# the web app's sources are built into the image; not its local build output
+llm-thingy-web/node_modules
+llm-thingy-web/dist
+llm-thingy-web/.git
+llm-thingy-web/.env
+llm-thingy-web/.env.*

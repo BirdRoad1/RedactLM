@@ -8,10 +8,10 @@ Companies like T. Rowe Price use LLMs extensively for vertification and market a
 ```sh
 cp .env.example .env        # set JWT_SECRET (openssl rand -base64 48) and POSTGRES_PASSWORD
 docker compose up -d --build
-docker compose exec -it api bun run create-admin you@example.com you
+docker compose exec -it app bun run create-admin you@example.com you
 ```
 
-Open http://localhost:8080 and sign in. Database migrations run whenever the API starts. For a local model (e.g. Gemma) as the LLM detector, also run `docker compose --profile local-ai up -d`, pull a model with `docker compose exec ollama ollama pull gemma3`, and add the "Ollama (local)" backend with `http://ollama:11434/v1` as its URL.
+Open http://localhost:8080 and sign in. One container serves the web app and the API (OpenAI-style clients use http://localhost:8080/v1); for HTTPS, put a reverse proxy such as Caddy in front and set `TRUST_PROXY=true`. Database migrations run whenever the API starts. For a local model (e.g. Gemma) as the LLM detector, also run `docker compose --profile local-ai up -d`, pull a model with `docker compose exec ollama ollama pull gemma3`, and add the "Ollama (local)" backend with `http://ollama:11434/v1` as its URL.
 
 ## Load testing
 

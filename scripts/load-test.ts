@@ -95,7 +95,7 @@ let userId: number | undefined;
 let restored = false;
 
 async function setUp() {
-  const alive = await fetch(`${BASE}/`).catch(() => undefined);
+  const alive = await fetch(`${BASE}/health`).catch(() => undefined);
   if (!alive?.ok) throw new Error(`No server answering at ${BASE}; start it first (bun run dev)`);
   // hundreds of requests a second from one user is exactly what the rate
   // limits stop; they'd turn the run into a wall of 429s
