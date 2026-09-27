@@ -6,11 +6,14 @@
     "create-admin": "bun run scripts/create-admin.ts",
     "test": "bun test",
     "migrate": "bun run scripts/migrate.ts",
-    "start": "bun run scripts/migrate.ts && bun run src/index.ts"
+    "start": "bun run scripts/migrate.ts && bun run src/index.ts",
+    "load-test": "bun run scripts/load-test.ts",
+    "load-test:live": "bun run scripts/load-test-live.ts"
   },
   "type": "module",
   "private": true,
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
     "@types/bun": "latest",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/pg": "^8.23.1",

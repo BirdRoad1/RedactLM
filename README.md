@@ -13,6 +13,16 @@ docker compose exec -it api bun run create-admin you@example.com you
 
 Open http://localhost:8080 and sign in. Database migrations run whenever the API starts. For a local model (e.g. Gemma) as the LLM detector, also run `docker compose --profile local-ai up -d`, pull a model with `docker compose exec ollama ollama pull gemma3`, and add the "Ollama (local)" backend with `http://ollama:11434/v1` as its URL.
 
+## Load testing
+
+With the dev server running (`bun run dev`):
+
+```sh
+bun run load-test --users 100 --duration 30
+```
+
+Many concurrent clients, signed in as one TestUser (`loadtest@test.local`, created if missing), hammer the API with a mix of live checks, chats (plain, streamed, with personal data, follow-ups), file checks, logins and history. Chats and the LLM detector go to a fake model the script runs, so nothing paid is called. It prints latency percentiles per request type and exits 1 on more than 1% unexpected answers or any server error. The detector settings, the fake backend and TestUser's chats and audit entries are put back afterwards, also on Ctrl+C. Options: `--base`, `--latency` (the fake model's thinking time, ms), `--with-models` (also calls `/v1/models`, which asks the real backends), `--keep-data`.
+
 ## LLM Credits
 I think API has a free API.
 Must buy $10 of Claude AI credits.
