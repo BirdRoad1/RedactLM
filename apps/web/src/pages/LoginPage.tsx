@@ -37,7 +37,7 @@ export function LoginPage() {
   return (
     <div className="login-page">
       <aside className="login-brand">
-        <span className="brand">LLM Thingy</span>
+        <span className="brand">RedactLM</span>
         <div className="login-pitch">
           <h2>Use AI without leaking what matters.</h2>
           <ul>
@@ -82,7 +82,7 @@ export function LoginPage() {
           {/* without single sign-on, accounts only come from an admin */}
           {!providers.length && (
             <p className="login-note">
-              No account yet? Your organization's administrator creates accounts for everyone who uses LLM Thingy. Ask
+              No account yet? Your organization's administrator creates accounts for everyone who uses RedactLM. Ask
               them to add you.
             </p>
           )}

@@ -2,7 +2,7 @@
 // web app uses (packages/shared/src/api.ts). Each line takes a service's
 // result, turns it into what it looks like as JSON (dates become strings),
 // and checks it fits; a mismatch fails the type check (tsc), not at runtime.
-import type * as Api from "@llm-thingy/shared";
+import type * as Api from "@redactlm/shared";
 import type { listAudit } from "./services/audit.service";
 import type { getConversation, listAllConversations, listConversations, reviewConversation } from "./services/conversations.service";
 import type { describePolicy } from "./services/detection-policy.service";

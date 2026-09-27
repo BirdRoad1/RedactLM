@@ -1,5 +1,5 @@
 {
-  "name": "@llm-thingy/shared",
+  "name": "@redactlm/shared",
   "private": true,
   "type": "module",
   "description": "Code the server and the web app both use: roles, the keyword rule, and the API's shapes",

@@ -3,15 +3,15 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "llm-thingy",
+      "name": "redactlm",
     },
     "apps/server": {
-      "name": "@llm-thingy/server",
+      "name": "@redactlm/server",
       "dependencies": {
         "@anthropic-ai/sdk": "^0.128.0",
         "@hono/swagger-ui": "^0.6.1",
-        "@llm-thingy/shared": "workspace:*",
         "@napi-rs/canvas": "^1.0.9",
+        "@redactlm/shared": "workspace:*",
         "@tesseract.js-data/eng": "^1.0.0",
         "dotenv": "^18.0.4",
         "drizzle-orm": "1.0.0-rc.4",
@@ -34,12 +34,12 @@
       },
     },
     "apps/web": {
-      "name": "@llm-thingy/web",
+      "name": "@redactlm/web",
       "version": "0.0.0",
       "dependencies": {
         "@fontsource-variable/bricolage-grotesque": "^5.3.0",
         "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
-        "@llm-thingy/shared": "workspace:*",
+        "@redactlm/shared": "workspace:*",
         "react": "^19.2.8",
         "react-dom": "^19.2.8",
         "react-markdown": "^10.1.0",
@@ -57,7 +57,7 @@
       },
     },
     "packages/shared": {
-      "name": "@llm-thingy/shared",
+      "name": "@redactlm/shared",
     },
   },
   "packages": {
@@ -127,12 +127,6 @@
 
     "@js-temporal/polyfill": ["@js-temporal/polyfill@0.5.1", "", { "dependencies": { "jsbi": "^4.3.0" } }, "sha512-hloP58zRVCRSpgDxmqCWJNlizAlUgJFqG2ypq79DCvyv9tHjRYMDOcPFjzfl/A1/YxDvRCZz8wvZvmapQnKwFQ=="],
 
-    "@llm-thingy/server": ["@llm-thingy/server@workspace:apps/server"],
-
-    "@llm-thingy/shared": ["@llm-thingy/shared@workspace:packages/shared"],
-
-    "@llm-thingy/web": ["@llm-thingy/web@workspace:apps/web"],
-
     "@napi-rs/canvas": ["@napi-rs/canvas@1.0.9", "", { "optionalDependencies": { "@napi-rs/canvas-android-arm64": "1.0.9", "@napi-rs/canvas-darwin-arm64": "1.0.9", "@napi-rs/canvas-darwin-x64": "1.0.9", "@napi-rs/canvas-linux-arm-gnueabihf": "1.0.9", "@napi-rs/canvas-linux-arm64-gnu": "1.0.9", "@napi-rs/canvas-linux-arm64-musl": "1.0.9", "@napi-rs/canvas-linux-riscv64-gnu": "1.0.9", "@napi-rs/canvas-linux-x64-gnu": "1.0.9", "@napi-rs/canvas-linux-x64-musl": "1.0.9", "@napi-rs/canvas-win32-arm64-msvc": "1.0.9", "@napi-rs/canvas-win32-x64-msvc": "1.0.9" } }, "sha512-QviPdJImDi/jMAvBfqaw+19BndMd/sizXVW3NnpMd3VJGz++QXkOHcP9kWR/smHG0hNjHeyuHFyrx/5lD0oNcQ=="],
 
     "@napi-rs/canvas-android-arm64": ["@napi-rs/canvas-android-arm64@1.0.9", "", { "os": "android", "cpu": "arm64" }, "sha512-4LGXk2/0HVzE29K8SzML5WubgCp++B1FH3qgl35XmSZE+lLdr6P9VRQEnZ0MCLZMTSuJP41yyhtoiVNEuvrTIA=="],
@@ -200,6 +194,12 @@
     "@pdf-lib/standard-fonts": ["@pdf-lib/standard-fonts@1.0.0", "", { "dependencies": { "pako": "^1.0.6" } }, "sha512-hU30BK9IUN/su0Mn9VdlVKsWBS6GyhVfqjwl1FjZN4TxP6cCw0jP2w7V3Hf5uX7M0AZJ16vey9yE0ny7Sa59ZA=="],
 
     "@pdf-lib/upng": ["@pdf-lib/upng@1.0.1", "", { "dependencies": { "pako": "^1.0.10" } }, "sha512-dQK2FUMQtowVP00mtIksrlZhdFXQZPC+taih1q4CvPZ5vqdxR/LKBaFg0oAfzd1GlHZXXSPdQfzQnt+ViGvEIQ=="],
+
+    "@redactlm/server": ["@redactlm/server@workspace:apps/server"],
+
+    "@redactlm/shared": ["@redactlm/shared@workspace:packages/shared"],
+
+    "@redactlm/web": ["@redactlm/web@workspace:apps/web"],
 
     "@remix-run/route-pattern": ["@remix-run/route-pattern@0.22.1", "", {}, "sha512-czdGJWh09Lapvcqt7Vb09KlrU2PhRJ8xQaI+AItTuD9aDJ5MAgxnS38lnys6Ll+6RJEqPiaUqTwIQhVLwFvv+w=="],
 
@@ -685,7 +685,7 @@
 
     "zwitch": ["zwitch@2.0.4", "", {}, "sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A=="],
 
-    "@llm-thingy/web/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
+    "@redactlm/web/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
     "@types/jsonwebtoken/@types/node": ["@types/node@26.6.3", "", { "dependencies": { "undici-types": "~8.9.0" } }, "sha512-dsqMQQoeTLqu9wynDD00q573mNzso3IdQOAfHRJqLCcmCFPoGo9A1bDpUcv/9tnKpErQWv9uKeGfl37EIS02Yg=="],
 

@@ -1,6 +1,6 @@
 {
-  "name": "LLM Thingy",
-  "short_name": "LLM Thingy",
+  "name": "RedactLM",
+  "short_name": "RedactLM",
   "description": "Use AI without leaking what matters.",
   "start_url": "/chat",
   "scope": "/",

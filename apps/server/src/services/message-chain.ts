@@ -7,7 +7,7 @@ import { env } from "../env/env";
 // server's secret: someone who can only write to the database can't reseal
 // what they changed. (Dropping the newest messages of a conversation isn't
 // caught: nothing after them is left to break.)
-const key = createHmac("sha256", env.JWT_SECRET).update("llm-thingy:message-chain").digest();
+const key = createHmac("sha256", env.JWT_SECRET).update("redactlm:message-chain").digest();
 
 export type SealedDetection = {
   checker: string;

@@ -1,5 +1,5 @@
 {
-  "name": "llm-thingy",
+  "name": "redactlm",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -8,10 +8,10 @@
   ],
   "scripts": {
     "dev": "bun run --filter './apps/*' dev",
-    "build": "bun run --filter @llm-thingy/web build",
+    "build": "bun run --filter @redactlm/web build",
     "test": "bun run --filter '*' test",
     "typecheck": "bun run --filter './apps/*' typecheck",
-    "lint": "bun run --filter @llm-thingy/web lint",
+    "lint": "bun run --filter @redactlm/web lint",
     "start": "bun run --cwd apps/server start",
     "migrate": "bun run --cwd apps/server migrate",
     "create-admin": "bun run --cwd apps/server create-admin",

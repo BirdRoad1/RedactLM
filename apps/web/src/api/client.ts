@@ -4,10 +4,10 @@ const BASE: string = import.meta.env.VITE_API_URL ?? '/api'
 
 // A full API address, for places the browser goes to directly (SSO)
 export const apiUrl = (path: string) => BASE + path
-const SESSION_KEY = 'llm-thingy.session'
+const SESSION_KEY = 'redactlm.session'
 
 // Fired when the server rejects our token, so the app can go back to login
-export const SESSION_EXPIRED = 'llm-thingy:session-expired'
+export const SESSION_EXPIRED = 'redactlm:session-expired'
 
 export class ApiError extends Error {
   readonly status: number

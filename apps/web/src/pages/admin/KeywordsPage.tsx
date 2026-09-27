@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { api, apiFetch } from '../../api/client'
 import type { AddKeywordsResult, Keyword } from '../../api/types'
-import { normalizeKeyword } from '@llm-thingy/shared'
+import { normalizeKeyword } from '@redactlm/shared'
 
 // the server's own rule for how keywords are kept, from the shared package
 const normalize = normalizeKeyword

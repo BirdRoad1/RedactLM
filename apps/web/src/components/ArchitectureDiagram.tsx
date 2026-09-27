@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-// Where LLM Thingy sits: between your people and the cloud AI, inside your
+// Where RedactLM sits: between your people and the cloud AI, inside your
 // company, with a local model and the audit log beside it. Drawn twice, wide
 // and tall; the page shows the one that fits (see .arch-wide / .arch-tall).
 
@@ -67,7 +67,7 @@ function Wide() {
   return (
     <svg className="arch arch-wide" viewBox="0 0 1100 560" role="img" aria-labelledby="arch-wide-title">
       <title id="arch-wide-title">
-        Your people send messages to LLM Thingy inside your company. It checks them with its own rules and a local AI
+        Your people send messages to RedactLM inside your company. It checks them with its own rules and a local AI
         model, logs every step, sends the cloud AI only a cleaned message, and passes the answer back, or says why a
         message was blocked.
       </title>
@@ -76,7 +76,7 @@ function Wide() {
       <text x="44" y="50" className="arch-boundary-label">Inside your company</text>
 
       <Node box={{ x: 36, y: 200, w: 172, h: 150 }} icon={icon(Laptop)} title="Your people" lines={['The web app, or any', 'OpenAI-compatible tool']} />
-      <Node box={{ x: 356, y: 175, w: 240, h: 200 }} icon={icon(Shield)} tone="main" title="LLM Thingy" lines={['Rules and your keywords', 'Reads attachments (OCR)', 'Placeholders or blocks']} />
+      <Node box={{ x: 356, y: 175, w: 240, h: 200 }} icon={icon(Shield)} tone="main" title="RedactLM" lines={['Rules and your keywords', 'Reads attachments (OCR)', 'Placeholders or blocks']} />
       <Node box={{ x: 381, y: 62, w: 190, h: 64 }} icon={null} title="Audit log" lines={['every step, never the text']} />
       <Node box={{ x: 381, y: 440, w: 190, h: 76 }} icon={null} title="Local AI model" lines={['on your own servers']} />
       <Node box={{ x: 862, y: 190, w: 210, h: 170 }} icon={icon(Cloud)} tone="cloud" title="Cloud AI" lines={['OpenAI · Anthropic', 'Google']} />
@@ -102,7 +102,7 @@ function Tall() {
   return (
     <svg className="arch arch-tall" viewBox="0 0 400 900" role="img" aria-labelledby="arch-tall-title">
       <title id="arch-tall-title">
-        Your people send messages to LLM Thingy inside your company. It checks them with its own rules and a local AI
+        Your people send messages to RedactLM inside your company. It checks them with its own rules and a local AI
         model, logs every step, sends the cloud AI only a cleaned message, and passes the answer back.
       </title>
       <Defs id="tall" />
@@ -110,7 +110,7 @@ function Tall() {
       <text x="28" y="38" className="arch-boundary-label">Inside your company</text>
 
       <Node box={{ x: 90, y: 56, w: 220, h: 120 }} icon={icon(Laptop)} title="Your people" lines={['The web app, or any', 'OpenAI-compatible tool']} />
-      <Node box={{ x: 60, y: 262, w: 280, h: 170 }} icon={icon(Shield)} tone="main" title="LLM Thingy" lines={['Rules and your keywords', 'Reads attachments (OCR)', 'Placeholders or blocks']} />
+      <Node box={{ x: 60, y: 262, w: 280, h: 170 }} icon={icon(Shield)} tone="main" title="RedactLM" lines={['Rules and your keywords', 'Reads attachments (OCR)', 'Placeholders or blocks']} />
       <Node box={{ x: 22, y: 528, w: 150, h: 96 }} icon={icon(Chip)} title="Local AI" lines={['your servers']} />
       <Node box={{ x: 228, y: 528, w: 150, h: 96 }} icon={icon(Log)} title="Audit log" lines={['never the text']} />
       <Node box={{ x: 90, y: 730, w: 220, h: 140 }} icon={icon(Cloud)} tone="cloud" title="Cloud AI" lines={['OpenAI · Anthropic', 'Google']} />

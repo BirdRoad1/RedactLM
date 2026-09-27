@@ -88,7 +88,7 @@ const readAsDataUri = (file: File) =>
 
 // Whether the chat list is collapsed, remembered per browser. Phones start
 // collapsed, since the open list covers the chat there.
-const SIDEBAR_KEY = 'llm-thingy.sidebar-collapsed'
+const SIDEBAR_KEY = 'redactlm.sidebar-collapsed'
 const isNarrow = () => window.matchMedia('(max-width: 700px)').matches
 
 function initiallyCollapsed() {

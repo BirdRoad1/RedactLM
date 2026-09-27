@@ -1,4 +1,4 @@
-import { valuesPattern } from '@llm-thingy/shared'
+import { valuesPattern } from '@redactlm/shared'
 import type { Swaps } from './placeholders'
 
 // Text as the AI received it: every occurrence of a swapped value becomes its

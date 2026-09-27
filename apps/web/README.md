@@ -1,6 +1,6 @@
-# LLM Thingy Web
+# RedactLM Web
 
-Web UI for the [LLM Thingy](../../) proxy: chat with PII checks, plus admin pages for
+Web UI for the [RedactLM](../../) proxy: chat with PII checks, plus admin pages for
 backends, users, the detection policy and the LLM detector.
 
 The styling is placeholder; the pages and API wiring are meant to be kept and reskinned.

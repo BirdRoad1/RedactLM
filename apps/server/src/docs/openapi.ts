@@ -111,7 +111,7 @@ const auditFilterParams = [
 export const openApiDoc = {
   openapi: "3.1.0",
   info: {
-    title: "LLM Thingy",
+    title: "RedactLM",
     version: "dev",
     description:
       "PII-filtering proxy for OpenAI-compatible LLM backends. Create the first admin with `bun run create-admin <email> <username>`, get a token from `POST /auth/login`, then click **Authorize**. \n\nAccess is by role, and `admin` holds them all: `override` may send messages as written, neither blocked nor replaced (`X-Override-Block`), `no_check` sends without any checks (as does `admin`), `review_chats` reads everyone's conversations under `/review`, `view_audit` reads `/audit-log`, `manage_users` manages `/users` (handing out only roles they hold), `manage_backends` manages `/backends`, `manage_settings` manages `/settings`, and `manage_keywords` sees and changes `/keywords`.\n\nRate limits are loose and per minute: sign-in and SSO 30 per address, chat 120, the model list 60, live checks 600, file checks 60 and audit exports 20 per user, and 3,000 requests of any kind per address. `RATE_LIMIT_MULTIPLIER` scales them (0 turns them off). Responses carry `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset`; over the limit is a 429 with `Retry-After`.",

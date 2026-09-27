@@ -1,5 +1,5 @@
 {
-  "name": "@llm-thingy/server",
+  "name": "@redactlm/server",
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "create-admin": "bun run scripts/create-admin.ts",
@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
-    "@llm-thingy/shared": "workspace:*",
+    "@redactlm/shared": "workspace:*",
     "@hono/swagger-ui": "^0.6.1",
     "@napi-rs/canvas": "^1.0.9",
     "@tesseract.js-data/eng": "^1.0.0",

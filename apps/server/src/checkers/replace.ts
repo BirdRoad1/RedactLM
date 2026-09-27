@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { placeholderLabel, replaceValues } from "@llm-thingy/shared";
+import { placeholderLabel, replaceValues } from "@redactlm/shared";
 import { env } from "../env/env";
 import { rewriteTextDataUri } from "../files/extract";
 import { CHECKER_NAME as KEYWORD_CHECKER } from "./keywords";
@@ -9,7 +9,7 @@ import { staticCheckerNames } from "./run-static-checks";
 // the same value always gets the same placeholder within a conversation, in
 // every message, file and turn, without storing the value anywhere; other
 // conversations get different ones, so they can't be linked.
-const key = createHmac("sha256", env.JWT_SECRET).update("llm-thingy:replacement-placeholders").digest();
+const key = createHmac("sha256", env.JWT_SECRET).update("redactlm:replacement-placeholders").digest();
 
 // What the rules (and custom keywords) find is labelled with what it is,
 // "SSN-3f9a1c0b7e2d"; what the local AI model finds stays "redacted-…".

@@ -1,9 +1,9 @@
 // The API's shapes come from the shared package; what's here is the web
 // app's own: attachments on the draft, and the chat requests it builds
-import type { Backend, ChatRole, Issue, PartialCheck } from '@llm-thingy/shared'
+import type { Backend, ChatRole, Issue, PartialCheck } from '@redactlm/shared'
 
-export type * from '@llm-thingy/shared'
-export type { UserRole as Role } from '@llm-thingy/shared'
+export type * from '@redactlm/shared'
+export type { UserRole as Role } from '@redactlm/shared'
 
 // OpenAI-style content parts, for messages with attachments
 export type ContentPart =

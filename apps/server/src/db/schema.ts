@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { boolean, check, index, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 
 // The roles live in the shared package (the web app lists them too)
-import { userRoles, type UserRole } from "@llm-thingy/shared";
+import { userRoles, type UserRole } from "@redactlm/shared";
 export { userRoles, type UserRole };
 export const userRoleEnum = pgEnum("user_role", userRoles);
 

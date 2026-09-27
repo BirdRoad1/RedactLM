@@ -1,6 +1,6 @@
 import { DetectionType, type Detection } from "./checker";
 import { Confidence } from "./confidence";
-import { normalizeKeyword, normalizeWord } from "@llm-thingy/shared";
+import { normalizeKeyword, normalizeWord } from "@redactlm/shared";
 
 // how keywords are kept is shared with the web app's preview
 export { normalizeKeyword };

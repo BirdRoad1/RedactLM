@@ -13,8 +13,8 @@ import { clientIp } from "../middleware/client-ip";
 // The round trip's state rides in a signed cookie that lasts 10 minutes.
 // SameSite=Lax: the provider's redirect back is a top-level navigation, which
 // Lax lets the cookie ride along with.
-const COOKIE = "llm_thingy_sso";
-const STATE_AUDIENCE = "llm-thingy:sso-state"; // can't be mistaken for a login token
+const COOKIE = "redactlm_sso";
+const STATE_AUDIENCE = "redactlm:sso-state"; // can't be mistaken for a login token
 const secure = env.PUBLIC_API_URL.startsWith("https:");
 
 const stateSchema = z.object({ slug: z.string(), state: z.string(), nonce: z.string(), verifier: z.string() });

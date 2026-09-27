@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { PLACEHOLDER } from '@llm-thingy/shared'
+import { PLACEHOLDER } from '@redactlm/shared'
 import { Link } from 'react-router'
 import { useAuth } from '../auth/AuthContext'
 import { ArchitectureDiagram } from '../components/ArchitectureDiagram'
@@ -11,7 +11,7 @@ import {
   SwapIcon,
 } from '../components/icons'
 
-// The public front page: what LLM Thingy is and does, with a small animated
+// The public front page: what RedactLM is and does, with a small animated
 // example of a message being checked. The example is an illustration built
 // into the page; nothing is sent anywhere.
 
@@ -149,7 +149,7 @@ export function LandingPage() {
   return (
     <div className="landing">
       <header className="landing-nav">
-        <Link to="/" className="brand">LLM Thingy</Link>
+        <Link to="/" className="brand">RedactLM</Link>
         <nav>
           <a href="#how">How it works</a>
           <a href="#features">Features</a>
@@ -163,7 +163,7 @@ export function LandingPage() {
           <p className="eyebrow">A privacy layer for AI chat</p>
           <h1>Use AI without leaking what matters.</h1>
           <p className="hero-lede">
-            LLM Thingy sits between your people and ChatGPT, Claude or Gemini. It catches personal data and company
+            RedactLM sits between your people and ChatGPT, Claude or Gemini. It catches personal data and company
             secrets before a message leaves, and swaps them for placeholders so the answer still helps.
           </p>
           <div className="hero-actions">
@@ -211,15 +211,15 @@ export function LandingPage() {
         <div>
           <h2>A drop-in for OpenAI clients</h2>
           <p>
-            Every tool that talks to the OpenAI API works through LLM Thingy: change the base URL, use your sign-in
+            Every tool that talks to the OpenAI API works through RedactLM: change the base URL, use your sign-in
             token as the key, and pick any model your admins set up. The same checks, the same audit log.
           </p>
         </div>
         <pre className="code-sample"><code>{`from openai import OpenAI
 
 client = OpenAI(
-    base_url="https://llm-thingy.yourcompany.com/v1",
-    api_key="<your LLM Thingy token>",
+    base_url="https://redactlm.yourcompany.com/v1",
+    api_key="<your RedactLM token>",
 )
 
 reply = client.chat.completions.create(
@@ -235,7 +235,7 @@ reply = client.chat.completions.create(
       </section>
 
       <footer className="landing-footer">
-        <span className="brand">LLM Thingy</span>
+        <span className="brand">RedactLM</span>
         <span>Built by Jose &amp; Tyler</span>
       </footer>
     </div>

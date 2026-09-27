@@ -1,4 +1,4 @@
-# LLM Thingy: the API and the web app in one image. Applies database
+# RedactLM: the API and the web app in one image. Applies database
 # migrations on start, then serves on :3000: the app at /, the API at /api
 # and at the root (/v1 for OpenAI-style clients).
 # Built and run by docker-compose.yml, next to Postgres.
@@ -20,7 +20,7 @@ RUN bun run build
 
 # the server's production dependencies only (no React, no dev tools)
 FROM manifests AS deps
-RUN bun install --frozen-lockfile --production --filter @llm-thingy/server
+RUN bun install --frozen-lockfile --production --filter @redactlm/server
 
 # the monorepo's layout, trimmed: the server finds apps/web/dist on its own
 FROM oven/bun:1.4

@@ -1,4 +1,4 @@
-import { PLACEHOLDER } from '@llm-thingy/shared'
+import { PLACEHOLDER } from '@redactlm/shared'
 import type { Attachment } from '../api/types'
 import type { Replaced } from '../api/chat'
 

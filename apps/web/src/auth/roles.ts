@@ -1,7 +1,7 @@
-import { hasRole as roleIn, roleInfo, userRoles, type UserRole } from '@llm-thingy/shared'
+import { hasRole as roleIn, roleInfo, userRoles, type UserRole } from '@redactlm/shared'
 import type { Me } from '../api/types'
 
-export { roleName } from '@llm-thingy/shared'
+export { roleName } from '@redactlm/shared'
 
 // Admins hold every role
 export const hasRole = (user: Me | null, role: UserRole) => !!user && roleIn(user.roles, role)
