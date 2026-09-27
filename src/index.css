@@ -63,8 +63,8 @@ label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.9rem; }
 
 .layout { min-height: 100vh; display: flex; flex-direction: column; }
 /* one gap for everything in the bar, so the title sits as far from the first link as the links do from each other */
-.topbar { display: flex; align-items: center; gap: 1.25rem; padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
-.topbar nav { display: flex; gap: inherit; flex-wrap: wrap; }
+.topbar { --bar-gap: 1.25rem; display: flex; align-items: center; gap: var(--bar-gap); padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.topbar nav { display: flex; gap: var(--bar-gap); flex-wrap: wrap; }
 .brand { font-size: 1.3rem; font-weight: 750; }
 .topbar nav a { color: var(--muted); text-decoration: none; font-weight: 500; }
 .topbar nav a.active { color: var(--fg); font-weight: 600; }
@@ -604,3 +604,44 @@ a.brand { color: inherit; text-decoration: none; }
 .presets button.chosen { background: var(--fg); border-color: var(--fg); color: var(--bg); }
 .preset-hint { margin: 0; }
 .login-note { margin: 0.2rem 0 0; font-size: 0.88rem; color: var(--muted); text-align: center; }
+
+/* Top bar: on narrow screens the links and account collapse behind a menu
+   button into a panel under the bar */
+.topbar { position: relative; }
+.topbar-menu { display: contents; }
+/* the same gap everywhere: the links' wrapper doesn't take part in the
+   layout on wide screens, so `inherit` would get its (empty) gap */
+.topbar-account { display: flex; align-items: center; gap: var(--bar-gap); }
+.menu-toggle { display: none; }
+@media (max-width: 800px) {
+  .topbar { flex-wrap: nowrap; }
+  .menu-toggle { display: grid; margin-left: auto; }
+  .topbar-menu {
+    display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 30;
+    flex-direction: column; gap: 0.2rem; padding: 0.5rem 0.75rem 0.9rem;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    box-shadow: 0 14px 30px rgb(0 0 0 / 0.12);
+    max-height: calc(100dvh - 4rem); overflow-y: auto;
+  }
+  .topbar-menu.open { display: flex; }
+  .topbar-menu nav { flex-direction: column; gap: 0.1rem; }
+  .topbar-menu nav a { padding: 0.7rem 0.6rem; border-radius: 10px; }
+  .topbar-menu nav a.active { background: var(--surface); }
+  .topbar-menu .spacer { display: none; }
+  .topbar-account { justify-content: space-between; gap: 1rem; margin-top: 0.4rem; padding: 0.8rem 0.6rem 0; border-top: 1px solid var(--border); }
+  .topbar-account .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* Phones: wide admin tables scroll within themselves instead of making the
+   whole page scroll sideways */
+@media (max-width: 800px) {
+  main table { display: block; max-width: 100%; overflow-x: auto; }
+}
+
+/* New chat: the HackUMBC crest in the middle of the empty chat */
+.chat-empty { margin: auto; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.5rem; max-width: 30rem; padding: 1rem 0 2rem; }
+.chat-empty-logo { width: clamp(96px, 22vmin, 150px); height: auto; margin-bottom: 0.6rem; filter: drop-shadow(0 10px 22px rgb(81 14 35 / 0.18)); }
+.chat-empty h2 { margin: 0; font-size: 1.5rem; }
+.chat-empty p { margin: 0; }
+.chat-empty-credit { margin-top: 0.4rem !important; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #b06a12; }
+@media (prefers-color-scheme: dark) { .chat-empty-credit { color: #e8c48d; } }
