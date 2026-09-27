@@ -33,7 +33,22 @@ type Entry = {
   replaced?: Issue[] // in the text: swapped for placeholders before sending
   replacedInFiles?: string[]
   overridden?: string[] // what would have been blocked or replaced, and was sent as written
+  stopped?: string // for a reply: why it ended early or came back empty
   stored?: boolean
+}
+
+// Why a reply ended early or came back empty, in words; undefined if it
+// simply finished
+function whyStopped(finishReason: string | null, streamError: string | null, empty: boolean) {
+  if (streamError) return `The reply stopped with an error: ${streamError}`
+  if (finishReason === 'content_filter') {
+    return empty
+      ? "No reply: the AI provider's safety filter declined this request."
+      : "The AI provider's safety filter stopped this reply partway."
+  }
+  if (finishReason === 'length') return 'Cut off: the reply reached its length limit.'
+  if (empty) return 'The AI sent back an empty reply.'
+  return undefined
 }
 
 // Where the draft was blocked; shown until the user edits it.
@@ -226,7 +241,7 @@ export function ChatPage() {
       })
 
     try {
-      const { warnings, partial, replaced, overridden } = await streamChat({
+      const { warnings, partial, replaced, overridden, finishReason, streamError } = await streamChat({
         conversationId: id,
         onConversationId: (newId) => {
           if (newId === id) return
@@ -239,6 +254,11 @@ export function ChatPage() {
         signal: abort.current.signal,
         onDelta: appendToReply,
         onReplaced: (replaced) => setSwaps((current) => new Map([...current, ...swapsFrom(replaced, history)])),
+      })
+      setEntries((current) => {
+        const reply = current[current.length - 1]!
+        const stopped = whyStopped(finishReason, streamError, !reply.content.trim())
+        return stopped ? [...current.slice(0, -1), { ...reply, stopped }] : current
       })
       if (overridden.length) {
         setEntries((current) =>
@@ -363,7 +383,9 @@ export function ChatPage() {
                     {entry.attachments.map((a) => <span key={a.id} className="attachment-ref"><PaperclipIcon size={13} /> {a.filename}</span>)}
                   </span>
                 )}
-                {entry.role === 'assistant' ? (
+                {entry.role === 'assistant' && !entry.content.trim() && !(busy && i === entries.length - 1) ? (
+                  <span className="muted no-reply">No reply</span>
+                ) : entry.role === 'assistant' ? (
                   <Markdown text={entry.content} swaps={swaps} aiView={aiView} />
                 ) : entry.stored ? (
                   <MessageContent text={entry.content} />
@@ -376,6 +398,7 @@ export function ChatPage() {
                 )}
                 {entry.role === 'assistant' && busy && i === entries.length - 1 && <span className="cursor">▍</span>}
               </div>
+              {entry.stopped && <p className="stopped-note">{entry.stopped}</p>}
               {entry.warnings && (
                 <p className="warning">
                   Sent with a warning: {[...new Set(entry.warnings.map((w) => w.title))].join(', ')}. Hover the highlight for details.

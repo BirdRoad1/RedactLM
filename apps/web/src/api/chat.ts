@@ -61,9 +61,13 @@ export async function streamChat({ conversationId, onConversationId, model, mess
   if (savedAs) onConversationId?.(savedAs)
   if (replaced.length) onReplaced?.(replaced)
 
-  // Server-Sent Events: "data: {chunk}" lines, ending with "data: [DONE]"
+  // Server-Sent Events: "data: {chunk}" lines, ending with "data: [DONE]".
+  // Why the reply ended ("stop", "length", "content_filter"...) comes in the
+  // last chunk; a failure partway arrives as an { error } event instead.
   const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader()
   let buffer = ''
+  let finishReason: string | null = null
+  let streamError: string | null = null
   for (;;) {
     const { done, value } = await reader.read()
     if (done) break
@@ -75,13 +79,16 @@ export async function streamChat({ conversationId, onConversationId, model, mess
       const data = line.slice(5).trim()
       if (!data || data === '[DONE]') continue
       try {
-        const delta = JSON.parse(data).choices?.[0]?.delta?.content
-        if (delta) onDelta(delta)
+        const chunk = JSON.parse(data)
+        if (chunk.error) streamError = chunk.error.message ?? 'Unknown error'
+        const choice = chunk.choices?.[0]
+        if (choice?.finish_reason) finishReason = choice.finish_reason
+        if (choice?.delta?.content) onDelta(choice.delta.content)
       } catch {
         // ignore keep-alives and partial junk
       }
     }
   }
 
-  return { warnings, partial, replaced, overridden, conversationId: savedAs }
+  return { warnings, partial, replaced, overridden, conversationId: savedAs, finishReason, streamError }
 }

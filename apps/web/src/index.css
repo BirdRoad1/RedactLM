@@ -304,6 +304,10 @@ kbd { font: inherit; font-size: 0.85em; border: 1px solid var(--border); border-
 .message.user .bubble mark.warned { background: #ffe6a1; box-shadow: 0 0 0 2px #ffe6a1; }
 .message.user .bubble mark.blocked { background: #ffd4d0; box-shadow: 0 0 0 2px #ffd4d0; }
 
+/* A reply that ended early or came back empty */
+.no-reply { font-style: italic; }
+.stopped-note { color: var(--warn); font-size: 0.85rem; margin: 0.2rem 0 0; }
+
 /* Values put back into AI replies, and placeholders as the AI saw them */
 mark.restored { background: var(--replace-mark); color: inherit; border-radius: 3px; padding: 0 2px; border-bottom: 1px dotted var(--replace); cursor: help; }
 mark.placeholder { background: none; color: var(--replace); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88em; border: 1px dashed var(--replace); border-radius: 3px; padding: 0 3px; cursor: help; }
