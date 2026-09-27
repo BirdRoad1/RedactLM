@@ -197,3 +197,11 @@ mark.redacted, .mirror mark.redacted { background: var(--replace-mark); box-shad
 .live-summary.redacted, .replaced-note { color: var(--replace); }
 .replaced-note { font-size: 0.85rem; margin: 0.35rem 0 0; }
 .message .replaced-note { margin-top: 0.2rem; }
+
+/* Audit log */
+.inline-filter { flex-direction: row; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem; }
+.event-tag { font-size: 0.78rem; padding: 0.05rem 0.5rem; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); }
+.event-tag.message_blocked, .event-tag.login_failed, .event-tag.detector_unavailable, .event-tag.attachment_refused { border-color: var(--danger); color: var(--danger); }
+.event-tag.message_warned { border-color: var(--warn); color: var(--warn); }
+.event-tag.message_replaced { border-color: var(--replace); color: var(--replace); }
+.event-tag.partially_checked { border-color: var(--info); color: var(--info); }
