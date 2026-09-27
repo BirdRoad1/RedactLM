@@ -1,5 +1,10 @@
 import type { Issue } from '../api/types'
 
+export const severity: Record<Issue['outcome'], number> = { warned: 1, redacted: 2, blocked: 3 }
+
+export const worst = (issues: Issue[]) =>
+  issues.reduce<Issue['outcome'] | null>((w, i) => (!w || severity[i.outcome] > severity[w] ? i.outcome : w), null)
+
 // Issues grouped by overlapping ranges, so each highlight is drawn once
 export type IssueGroup = { start: number; end: number; issues: Issue[]; outcome: Issue['outcome'] }
 
@@ -11,7 +16,7 @@ export function groupIssues(issues: Issue[]): IssueGroup[] {
     if (last && issue.start < last.end) {
       last.end = Math.max(last.end, issue.end)
       last.issues.push(issue)
-      if (issue.outcome === 'blocked') last.outcome = 'blocked'
+      if (severity[issue.outcome] > severity[last.outcome]) last.outcome = issue.outcome
     } else {
       groups.push({ start: issue.start, end: issue.end, issues: [issue], outcome: issue.outcome })
     }
@@ -33,7 +38,7 @@ export function segments(text: string, groups: IssueGroup[]) {
 }
 
 export function outcomeLabel(outcome: Issue['outcome']) {
-  return outcome === 'blocked' ? "Won't be sent" : 'Warning'
+  return outcome === 'blocked' ? "Won't be sent" : outcome === 'redacted' ? 'Will be replaced' : 'Warning'
 }
 
 export function likelihood(confidence: number) {

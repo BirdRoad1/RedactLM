@@ -3,6 +3,9 @@ import type { ChatMessage, FlaggedDetection, PartialCheck } from './types'
 
 export type PartialNotice = PartialCheck & { messageIndex: number; source?: { filename: string } }
 
+// Swapped for a placeholder before sending (replace mode)
+export type Replaced = { messageIndex: number; start: number; end: number; title: string; placeholder: string; source?: { filename: string } }
+
 // The proxy refused the request because something reached the block threshold
 export class BlockedError extends Error {
   readonly detections: FlaggedDetection[]
@@ -43,6 +46,7 @@ export async function streamChat({ conversationId, onConversationId, model, mess
 
   const warnings = JSON.parse(res.headers.get('X-PII-Warnings') ?? '[]') as FlaggedDetection[]
   const partial = JSON.parse(res.headers.get('X-Partially-Checked') ?? '[]') as PartialNotice[]
+  const replaced = JSON.parse(res.headers.get('X-PII-Replaced') ?? '[]') as Replaced[]
   const savedAs = res.headers.get('X-Conversation-Id') ?? conversationId
   if (savedAs) onConversationId?.(savedAs)
 
@@ -68,5 +72,5 @@ export async function streamChat({ conversationId, onConversationId, model, mess
     }
   }
 
-  return { warnings, partial, conversationId: savedAs }
+  return { warnings, partial, replaced, conversationId: savedAs }
 }

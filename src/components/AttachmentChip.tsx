@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Attachment, PartialCheck } from '../api/types'
 import { IssuePopup } from './IssuePopup'
+import { worst as worstOf } from './issues'
 
 const n = (x: number) => x.toLocaleString()
 
@@ -10,12 +11,13 @@ export const partialNote = ({ checkedChars, totalChars }: PartialCheck) =>
 // A file on the draft: what it is, whether it's safe to send, and why not
 export function AttachmentChip({ attachment: a, onRemove }: { attachment: Attachment; onRemove?: () => void }) {
   const [anchor, setAnchor] = useState<DOMRect | null>(null)
-  const worst = a.issues.some((i) => i.outcome === 'blocked') ? 'blocked' : a.issues.length ? 'warned' : 'ok'
+  const worst = worstOf(a.issues) ?? 'ok'
   const status =
     a.status === 'checking' ? 'Checking…'
     : a.status === 'error' ? "Can't be sent"
     : !a.issues.length ? (a.partial ? 'Passed, partly checked' : 'No issues found')
     : worst === 'blocked' ? "Won't be sent"
+    : worst === 'redacted' ? 'Will be replaced'
     : 'Has warnings'
 
   return (
@@ -34,7 +36,7 @@ export function AttachmentChip({ attachment: a, onRemove }: { attachment: Attach
       )}
       {anchor && !a.error && (
         <IssuePopup
-          group={{ start: 0, end: 0, issues: a.issues, outcome: worst === 'blocked' ? 'blocked' : 'warned' }}
+          group={{ start: 0, end: 0, issues: a.issues, outcome: worst === 'ok' ? 'warned' : worst }}
           anchor={anchor}
           note={a.partial ? partialNote(a.partial) : undefined}
         />

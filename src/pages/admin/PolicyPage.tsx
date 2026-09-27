@@ -1,20 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../api/client'
-import type { DetectionPolicy, Threshold } from '../../api/types'
+import type { BlockMode, DetectionPolicy, Threshold } from '../../api/types'
 import { ThresholdInput } from '../../components/ThresholdInput'
 
 type Thresholds = { warnAt: Threshold; blockAt: Threshold }
+type Defaults = Thresholds & { mode: BlockMode }
 
 export function PolicyPage() {
   const [policy, setPolicy] = useState<DetectionPolicy | null>(null)
-  const [defaults, setDefaults] = useState<Thresholds>({ warnAt: null, blockAt: null })
+  const [defaults, setDefaults] = useState<Defaults>({ warnAt: null, blockAt: null, mode: 'block' })
   const [edits, setEdits] = useState<Record<string, Thresholds>>({})
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
 
   const apply = useCallback((p: DetectionPolicy) => {
     setPolicy(p)
-    setDefaults({ warnAt: p.warnAt, blockAt: p.blockAt })
+    setDefaults({ warnAt: p.warnAt, blockAt: p.blockAt, mode: p.mode })
     setEdits(Object.fromEntries(p.checkers.map((c) => [c.checker, { warnAt: c.warnAt, blockAt: c.blockAt }])))
   }, [])
 
@@ -39,7 +40,9 @@ export function PolicyPage() {
     <section>
       <h1>Detection policy</h1>
       <p className="muted">
-        Every detection has a confidence from 0 to 1. At or above <strong>block</strong> the message isn't sent; at or
+        Every detection has a confidence from 0 to 1. At or above <strong>block</strong> the message isn't sent, or, if you
+        choose to replace, what was found is swapped for a placeholder like <code>redacted-3f9a1c0b7e2d</code> and the
+        message is sent. Replacing works in message text and plain-text files; PDFs and images are still stopped. At or
         above <strong>warn</strong> it's sent with a warning. Detected text is masked in storage either way.
       </p>
       {error && <p className="error">{error}</p>}
@@ -49,6 +52,13 @@ export function PolicyPage() {
       <div className="card inline-form">
         <label>Warn at <ThresholdInput value={defaults.warnAt} onChange={(warnAt) => setDefaults({ ...defaults, warnAt })} /></label>
         <label>Block at <ThresholdInput value={defaults.blockAt} onChange={(blockAt) => setDefaults({ ...defaults, blockAt })} /></label>
+        <label>
+          When something reaches “block at”
+          <select value={defaults.mode} onChange={(e) => setDefaults({ ...defaults, mode: e.target.value as BlockMode })}>
+            <option value="block">Stop the message</option>
+            <option value="replace">Replace it with a placeholder where possible</option>
+          </select>
+        </label>
         <button onClick={() => run('defaults', api('/settings/detection-policy', 'PATCH', defaults))}>Save defaults</button>
       </div>
 

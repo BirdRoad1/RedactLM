@@ -22,6 +22,8 @@ type Entry = {
   warnings?: Issue[]
   fileWarnings?: string[]
   partial?: string[] // passed, but only partly checked
+  replaced?: Issue[] // in the text: swapped for placeholders before sending
+  replacedInFiles?: string[]
   stored?: boolean
 }
 
@@ -177,7 +179,7 @@ export function ChatPage() {
       })
 
     try {
-      const { warnings, partial } = await streamChat({
+      const { warnings, partial, replaced } = await streamChat({
         conversationId: id,
         onConversationId: (newId) => {
           if (newId === id) return
@@ -189,6 +191,20 @@ export function ChatPage() {
         signal: abort.current.signal,
         onDelta: appendToReply,
       })
+      if (replaced.length) {
+        setEntries((current) =>
+          current.map((entry, i) => {
+            const mine = replaced.filter((r) => r.messageIndex === i)
+            if (!mine.length) return entry
+            const inText: Issue[] = mine.filter((r) => !r.source).map((r) => ({
+              start: r.start, end: r.end, outcome: 'redacted', title: r.title, placeholder: r.placeholder,
+              reason: '', explanation: '', confidence: 1,
+            }))
+            const inFiles = [...new Set(mine.filter((r) => r.source).map((r) => `${r.title} in "${r.source!.filename}"`))]
+            return { ...entry, replaced: inText.length ? inText : undefined, replacedInFiles: inFiles.length ? inFiles : undefined }
+          }),
+        )
+      }
       if (partial.length) {
         const n = (x: number) => x.toLocaleString()
         setEntries((current) =>
@@ -265,8 +281,8 @@ export function ChatPage() {
                 )}
                 {entry.stored ? (
                   <MessageContent text={entry.content} />
-                ) : entry.warnings ? (
-                  <HighlightedText text={entry.content} issues={entry.warnings} />
+                ) : entry.warnings || entry.replaced ? (
+                  <HighlightedText text={entry.content} issues={[...(entry.warnings ?? []), ...(entry.replaced ?? [])]} />
                 ) : (
                   entry.content
                 )}
@@ -278,6 +294,13 @@ export function ChatPage() {
                 </p>
               )}
               {entry.fileWarnings && <p className="warning">Sent with a warning: {entry.fileWarnings.join('; ')}.</p>}
+              {(entry.replaced || entry.replacedInFiles) && (
+                <p className="replaced-note">
+                  Replaced before sending, so the AI saw placeholders instead:{' '}
+                  {[...new Set((entry.replaced ?? []).map((r) => r.title)), ...(entry.replacedInFiles ?? [])].join(', ')}.
+                  {entry.replaced && ' Hover the highlights to see what was sent.'}
+                </p>
+              )}
               {entry.partial && (
                 <p className="partial-note" title="The rule-based checks read everything; the AI check reads a limited amount so sending stays fast.">
                   Passed, but only partly checked: the AI check read {entry.partial.join(' and ')}.
@@ -358,8 +381,9 @@ function LiveSummary({ issues }: { issues: Issue[] }) {
   if (!issues.length) return null
   const kinds = [...new Map(issues.map((i) => [i.title, i])).values()]
   const blocking = kinds.some((i) => i.outcome === 'blocked')
+  const tone = blocking ? 'blocked' : kinds.some((i) => i.outcome === 'redacted') ? 'redacted' : 'warned'
   return (
-    <p className={`live-summary ${blocking ? 'blocked' : 'warned'}`}>
+    <p className={`live-summary ${tone}`}>
       {kinds.map((i) => `${i.title} (${outcomeLabel(i.outcome).toLowerCase()})`).join(', ')}
       {blocking ? ". This message won't be sent as it is." : '.'} Hover the highlights for details.
     </p>

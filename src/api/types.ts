@@ -27,12 +27,13 @@ export type ChatMessage = { role: ChatRole; content: string | ContentPart[] }
 export type Issue = {
   start: number
   end: number
-  outcome: 'warned' | 'blocked'
+  outcome: 'warned' | 'redacted' | 'blocked' // redacted: swapped for a placeholder before sending
   title: string // "Phone number"
   reason: string // "This looks like a phone number."
   explanation: string // why it matters and what to do instead
   confidence: number
   page?: number | null // for issues in a PDF attachment
+  placeholder?: string // what was sent instead, once replaced
 }
 
 // An issue in a sent message, as reported by the chat endpoint
@@ -80,7 +81,10 @@ export type NewBackend = Omit<Backend, 'id' | 'apiKey'> & { apiKey: string | nul
 
 export type Threshold = number | null // null = never
 
+export type BlockMode = 'block' | 'replace'
+
 export type DetectionPolicy = {
+  mode: BlockMode
   warnAt: Threshold
   blockAt: Threshold
   checkers: { checker: string; warnAt: Threshold; blockAt: Threshold; overridden: boolean }[]

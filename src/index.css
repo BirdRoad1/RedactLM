@@ -186,3 +186,14 @@ mark.blocked, .mirror mark.blocked { background: var(--danger-mark); box-shadow:
 .partial-note { color: var(--info); font-size: 0.85rem; margin: 0.2rem 0 0; cursor: help; }
 .issue-note { border-top: 1px solid var(--border); margin-top: 0.5rem; padding-top: 0.5rem; }
 .nowrap { white-space: nowrap; }
+
+/* Replace mode: swapped for a placeholder before sending */
+:root { --replace: #6a3fb5; --replace-mark: rgb(124 77 255 / 0.2); }
+@media (prefers-color-scheme: dark) { :root { --replace: #c3a6ff; --replace-mark: rgb(179 136 255 / 0.28); } }
+mark.redacted, .mirror mark.redacted { background: var(--replace-mark); box-shadow: 0 0 0 2px var(--replace-mark); color: inherit; border-radius: 4px; }
+.pill.redacted { background: var(--replace-mark); color: var(--replace); }
+.attachment.redacted { border-color: var(--replace); background: var(--replace-mark); cursor: help; }
+.attachment.redacted .attachment-status { color: var(--replace); }
+.live-summary.redacted, .replaced-note { color: var(--replace); }
+.replaced-note { font-size: 0.85rem; margin: 0.35rem 0 0; }
+.message .replaced-note { margin-top: 0.2rem; }
