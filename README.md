@@ -3,6 +3,16 @@
 ## Purpose
 Companies like T. Rowe Price use LLMs extensively for vertification and market analysis. It's important to prevent things like PII, company secrets, and other sensitive data from going to Anthropic, OpenAI, or Google. Even if they get audited and are found to protect the data well, they should not get unnecessary PII in the first place as a matter of data security.
 
+## Getting the code
+
+The web app lives in its own repo, [llm-thingy-web](../llm-thingy-web), included here as a git submodule in `llm-thingy-web/` (the Docker image builds it). Clone both at once:
+
+```sh
+git clone --recursive gitea:jluims/llm-thingy.git
+```
+
+Already cloned without it? Run `git submodule update --init`. After pulling changes that move the web app forward, run `git submodule update` again. To ship web app changes here: commit and push them in `llm-thingy-web/`, then commit the updated `llm-thingy-web` pointer in this repo.
+
 ## Run with Docker
 
 ```sh

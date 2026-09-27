@@ -1,0 +1,3 @@
+[submodule "llm-thingy-web"]
+	path = llm-thingy-web
+	url = ../llm-thingy-web.git
