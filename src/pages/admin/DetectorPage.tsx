@@ -2,17 +2,20 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../../api/client'
 import type { Backend, LlmDetector } from '../../api/types'
 
+// the server only lists local backends, since the detector sees every prompt
+type DetectorBackend = Pick<Backend, 'id' | 'name' | 'slug'>
+
 export function DetectorPage() {
   const [config, setConfig] = useState<LlmDetector | null>(null)
-  const [backends, setBackends] = useState<Backend[]>([])
+  const [backends, setBackends] = useState<DetectorBackend[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    Promise.all([api<LlmDetector>('/settings/llm-detector'), api<Backend[]>('/backends')])
+    Promise.all([api<LlmDetector>('/settings/llm-detector'), api<DetectorBackend[]>('/settings/llm-detector/backends')])
       .then(([c, b]) => {
         setConfig(c)
-        setBackends(b.filter((backend) => backend.trust === 'local'))
+        setBackends(b)
       })
       .catch((err) => setError(err.message))
   }, [])

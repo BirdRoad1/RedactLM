@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { BlockedError, streamChat } from '../api/chat'
 import { checkFile } from '../api/check'
 import { api } from '../api/client'
 import { deleteConversation, getConversation, listConversations } from '../api/conversations'
+import { useAuth } from '../auth/AuthContext'
+import { hasRole } from '../auth/roles'
 import type { Attachment, ChatMessage, ContentPart, ConversationSummary, FlaggedDetection, Issue, Model } from '../api/types'
 import { AttachmentChip } from '../components/AttachmentChip'
 import { CheckedTextarea } from '../components/CheckedTextarea'
@@ -24,11 +26,13 @@ type Entry = {
   partial?: string[] // passed, but only partly checked
   replaced?: Issue[] // in the text: swapped for placeholders before sending
   replacedInFiles?: string[]
+  overridden?: string[] // what would have been blocked or replaced, and was sent as written
   stored?: boolean
 }
 
-// Where the draft was blocked; shown until the user edits it
-type Blocked = { draft: string; issues: Issue[]; inFiles: FlaggedDetection[] }
+// Where the draft was blocked; shown until the user edits it.
+// `overridable`: this user may send it anyway.
+type Blocked = { draft: string; issues: Issue[]; inFiles: FlaggedDetection[]; overridable: boolean }
 
 const where = (d: FlaggedDetection) =>
   d.source ? `"${d.source.filename}"${d.source.page ? `, page ${d.source.page}` : ''}` : ''
@@ -77,7 +81,11 @@ export function ChatPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const abort = useRef<AbortController | null>(null)
-  const liveIssues = useLiveCheck(draft)
+  const { user } = useAuth()
+  // no_check (and admins): nothing is checked, so there's nothing to highlight
+  const unchecked = hasRole(user, 'no_check')
+  const canOverride = hasRole(user, 'override')
+  const liveIssues = useLiveCheck(unchecked ? '' : draft)
 
   useEffect(() => {
     api<{ data: Model[] }>('/v1/models')
@@ -143,10 +151,11 @@ export function ChatPage() {
         filename: file.name,
         mime: file.type || 'application/octet-stream',
         dataUri: await readAsDataUri(file),
-        status: 'checking',
+        status: unchecked ? 'unchecked' : 'checking',
         issues: [],
       }
       setAttachments((current) => [...current, attachment])
+      if (unchecked) continue
       const update = (changes: Partial<Attachment>) =>
         setAttachments((current) => current.map((a) => (a.id === attachment.id ? { ...a, ...changes } : a)))
       checkFile(file.name, attachment.dataUri)
@@ -155,8 +164,8 @@ export function ChatPage() {
     }
   }
 
-  async function send(e: FormEvent) {
-    e.preventDefault()
+  // `override`: send even if blocked (Ctrl+Enter, for the override role)
+  async function send(override = false) {
     const text = draft.trim()
     const files = attachments
     if ((!text && !files.length) || !model || busy) return
@@ -179,7 +188,7 @@ export function ChatPage() {
       })
 
     try {
-      const { warnings, partial, replaced } = await streamChat({
+      const { warnings, partial, replaced, overridden } = await streamChat({
         conversationId: id,
         onConversationId: (newId) => {
           if (newId === id) return
@@ -188,9 +197,20 @@ export function ChatPage() {
         },
         model,
         messages: history.map(toMessage),
+        override,
         signal: abort.current.signal,
         onDelta: appendToReply,
       })
+      if (overridden.length) {
+        setEntries((current) =>
+          current.map((entry, i) => {
+            const mine = overridden.filter((d) => d.messageIndex === i)
+            return mine.length
+              ? { ...entry, overridden: [...new Set(mine.map((d) => (d.source ? `${d.title} in ${where(d)}` : d.title)))] }
+              : entry
+          }),
+        )
+      }
       if (replaced.length) {
         setEntries((current) =>
           current.map((entry, i) => {
@@ -246,6 +266,7 @@ export function ChatPage() {
           draft: text,
           issues: asIssues(mine.filter((d) => !d.source), 'blocked'),
           inFiles: mine.filter((d) => d.source),
+          overridable: err.overridable,
         })
       } else {
         setError(err instanceof Error ? err.message : String(err))
@@ -270,7 +291,13 @@ export function ChatPage() {
         </div>
 
         <div className="messages">
-          {!entries.length && <p className="muted">Messages are checked for sensitive information before they leave the company.</p>}
+          {!entries.length && (
+            <p className="muted">
+              {unchecked
+                ? "Your messages aren't checked for sensitive information, so take care what you send."
+                : 'Messages are checked for sensitive information before they leave the company.'}
+            </p>
+          )}
           {entries.map((entry, i) => (
             <div key={i} className={`message ${entry.role}`}>
               <div className="bubble">
@@ -294,6 +321,9 @@ export function ChatPage() {
                 </p>
               )}
               {entry.fileWarnings && <p className="warning">Sent with a warning: {entry.fileWarnings.join('; ')}.</p>}
+              {entry.overridden && (
+                <p className="overridden-note">Sent as written, overriding the checks: {entry.overridden.join(', ')}. This is recorded in the audit log.</p>
+              )}
               {(entry.replaced || entry.replacedInFiles) && (
                 <p className="replaced-note">
                   Replaced before sending, so the AI saw placeholders instead:{' '}
@@ -328,6 +358,14 @@ export function ChatPage() {
               </p>
             )}
             <p className="muted">{fixHint(blocked)}</p>
+            {blocked.overridable && (
+              <div className="override">
+                <button type="button" onClick={() => send(true)} disabled={busy}>Send anyway</button>
+                <span className="small muted">
+                  or press <kbd>Ctrl</kbd>+<kbd>Enter</kbd>. It goes to the AI model exactly as written, and is recorded in the audit log.
+                </span>
+              </div>
+            )}
           </div>
         )}
         {error && <p className="error">{error}</p>}
@@ -339,7 +377,7 @@ export function ChatPage() {
             ))}
           </div>
         )}
-        <form className="composer" onSubmit={send}>
+        <form className="composer" onSubmit={(e) => { e.preventDefault(); send() }}>
           <input
             ref={fileInput}
             type="file"
@@ -358,10 +396,11 @@ export function ChatPage() {
             rows={3}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                e.currentTarget.form?.requestSubmit()
-              }
+              if (e.key !== 'Enter' || e.shiftKey) return
+              e.preventDefault()
+              // Ctrl+Enter (Cmd+Enter on a Mac) sends even if blocked
+              if ((e.ctrlKey || e.metaKey) && canOverride) send(true)
+              else e.currentTarget.form?.requestSubmit()
             }}
           />
           {busy ? (
@@ -370,22 +409,26 @@ export function ChatPage() {
             <button type="submit" disabled={(!draft.trim() && !attachments.length) || !model}>Send</button>
           )}
         </form>
-        <LiveSummary issues={liveIssues} />
+        <LiveSummary issues={liveIssues} canOverride={canOverride} />
+        {unchecked && <p className="unchecked-note">Not checked: your messages and files go out as they are.</p>}
       </div>
     </div>
   )
 }
 
 // One line under the input saying what the highlights mean
-function LiveSummary({ issues }: { issues: Issue[] }) {
+function LiveSummary({ issues, canOverride }: { issues: Issue[]; canOverride: boolean }) {
   if (!issues.length) return null
   const kinds = [...new Map(issues.map((i) => [i.title, i])).values()]
   const blocking = kinds.some((i) => i.outcome === 'blocked')
-  const tone = blocking ? 'blocked' : kinds.some((i) => i.outcome === 'redacted') ? 'redacted' : 'warned'
+  const replacing = kinds.some((i) => i.outcome === 'redacted')
+  const tone = blocking ? 'blocked' : replacing ? 'redacted' : 'warned'
+  // Ctrl+Enter sends it exactly as typed: nothing blocked, nothing replaced
+  const override = canOverride && (blocking || replacing) ? ' Ctrl+Enter sends it as written.' : ''
   return (
     <p className={`live-summary ${tone}`}>
       {kinds.map((i) => `${i.title} (${outcomeLabel(i.outcome).toLowerCase()})`).join(', ')}
-      {blocking ? ". This message won't be sent as it is." : '.'} Hover the highlights for details.
+      {blocking ? ". This message won't be sent as it is." : '.'}{override} Hover the highlights for details.
     </p>
   )
 }

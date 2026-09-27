@@ -1,12 +1,25 @@
 // Shapes returned by the llm-thingy API (see its /openapi.json)
 
+// What a user may do; "admin" includes every other role
+export type Role =
+  | 'admin'
+  | 'override'
+  | 'no_check'
+  | 'review_chats'
+  | 'view_audit'
+  | 'manage_users'
+  | 'manage_backends'
+  | 'manage_settings'
+
 export type Me = {
   id: number
   email: string
   username: string
-  isAdmin: boolean
+  roles: Role[]
   createdAt: string
 }
+
+export type User = Me
 
 export type Session = { token: string; expiresAt: string }
 
@@ -49,7 +62,7 @@ export type Attachment = {
   filename: string
   mime: string
   dataUri: string
-  status: 'checking' | 'checked' | 'error'
+  status: 'checking' | 'checked' | 'error' | 'unchecked' // unchecked: the user's files aren't checked
   issues: Issue[]
   pages?: number | null
   partial?: PartialCheck | null // longer than the AI detector reads
@@ -113,11 +126,41 @@ export type AuditEntry = {
 
 export type ConversationSummary = { id: string; title: string; updatedAt: string }
 
+// What happened to a stored message
+export type MessageAction = 'allowed' | 'warned' | 'redacted' | 'blocked' | 'overridden' | 'unchecked'
+
+// Everyone's conversations, for reviewers. Counts are of messages.
+export type ReviewSummary = {
+  id: string
+  title: string | null // null: nothing was ever sent
+  updatedAt: string
+  user: string
+  blocked: number
+  overridden: number
+  unchecked: number
+}
+
+export type ReviewConversation = {
+  id: string
+  title: string | null
+  updatedAt: string
+  client: string | null
+  user: string
+  messages: {
+    role: ChatRole | 'developer' | 'tool'
+    content: string
+    action: MessageAction
+    model: string | null
+    createdAt: string
+    detections: { reason: string; location: string | null; confidence: number; outcome: string }[]
+  }[]
+}
+
 // Stored messages have sensitive parts masked as "[REDACTED: Phone number]"
 export type Conversation = {
   id: string
   title: string | null
   updatedAt: string
   model: string | null
-  messages: { role: ChatRole | 'developer' | 'tool'; content: string; action: string }[]
+  messages: { role: ChatRole | 'developer' | 'tool'; content: string; action: MessageAction }[]
 }

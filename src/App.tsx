@@ -1,11 +1,14 @@
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router'
+import type { Role } from './api/types'
 import { useAuth } from './auth/AuthContext'
+import { hasRole } from './auth/roles'
 import { Layout } from './components/Layout'
 import { AuditPage } from './pages/admin/AuditPage'
 import { BackendsPage } from './pages/admin/BackendsPage'
 import { DetectorPage } from './pages/admin/DetectorPage'
 import { PolicyPage } from './pages/admin/PolicyPage'
+import { ReviewPage } from './pages/admin/ReviewPage'
 import { UsersPage } from './pages/admin/UsersPage'
 import { ChatPage } from './pages/ChatPage'
 import { LoginPage } from './pages/LoginPage'
@@ -17,9 +20,9 @@ function RequireUser({ children }: { children: ReactNode }) {
   return user ? children : <Navigate to="/login" replace />
 }
 
-function RequireAdmin({ children }: { children: ReactNode }) {
+function RequireRole({ role, children }: { role: Role; children: ReactNode }) {
   const { user } = useAuth()
-  return user?.isAdmin ? children : <Navigate to="/" replace />
+  return hasRole(user, role) ? children : <Navigate to="/" replace />
 }
 
 export function App() {
@@ -29,11 +32,13 @@ export function App() {
       <Route element={<RequireUser><Layout /></RequireUser>}>
         <Route index element={<ChatPage />} />
         <Route path="c/:id" element={<ChatPage />} />
-        <Route path="admin/backends" element={<RequireAdmin><BackendsPage /></RequireAdmin>} />
-        <Route path="admin/users" element={<RequireAdmin><UsersPage /></RequireAdmin>} />
-        <Route path="admin/policy" element={<RequireAdmin><PolicyPage /></RequireAdmin>} />
-        <Route path="admin/detector" element={<RequireAdmin><DetectorPage /></RequireAdmin>} />
-        <Route path="admin/audit" element={<RequireAdmin><AuditPage /></RequireAdmin>} />
+        <Route path="admin/backends" element={<RequireRole role="manage_backends"><BackendsPage /></RequireRole>} />
+        <Route path="admin/users" element={<RequireRole role="manage_users"><UsersPage /></RequireRole>} />
+        <Route path="admin/policy" element={<RequireRole role="manage_settings"><PolicyPage /></RequireRole>} />
+        <Route path="admin/detector" element={<RequireRole role="manage_settings"><DetectorPage /></RequireRole>} />
+        <Route path="admin/audit" element={<RequireRole role="view_audit"><AuditPage /></RequireRole>} />
+        <Route path="admin/review" element={<RequireRole role="review_chats"><ReviewPage /></RequireRole>} />
+        <Route path="admin/review/:id" element={<RequireRole role="review_chats"><ReviewPage /></RequireRole>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

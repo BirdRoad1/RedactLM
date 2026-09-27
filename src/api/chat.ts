@@ -9,10 +9,12 @@ export type Replaced = { messageIndex: number; start: number; end: number; title
 // The proxy refused the request because something reached the block threshold
 export class BlockedError extends Error {
   readonly detections: FlaggedDetection[]
+  readonly overridable: boolean // this user may send it anyway
 
-  constructor(message: string, detections: FlaggedDetection[]) {
+  constructor(message: string, detections: FlaggedDetection[], overridable: boolean) {
     super(message)
     this.detections = detections
+    this.overridable = overridable
   }
 }
 
@@ -21,25 +23,31 @@ type ChatOptions = {
   onConversationId?: (id: string) => void // as soon as the server says which conversation it is
   model: string
   messages: ChatMessage[]
+  override?: boolean // send even if blocked (needs the override role)
   signal?: AbortSignal
   onDelta: (text: string) => void // called with each streamed piece of the reply
 }
 
 // Streams a chat completion. Resolves with any warnings the proxy attached;
 // throws BlockedError when blocked, ApiError for other failures.
-export async function streamChat({ conversationId, onConversationId, model, messages, signal, onDelta }: ChatOptions) {
+export async function streamChat({ conversationId, onConversationId, model, messages, override, signal, onDelta }: ChatOptions) {
   let res: Response
   try {
     res = await apiFetch('/v1/chat/completions', {
       method: 'POST',
       body: JSON.stringify({ model, messages, stream: true }),
-      headers: conversationId ? { 'X-Conversation-Id': conversationId } : undefined,
+      headers: {
+        ...(conversationId && { 'X-Conversation-Id': conversationId }),
+        ...(override && { 'X-Override-Block': 'true' }),
+      },
       signal,
     })
   } catch (err) {
-    const body = err instanceof ApiError ? (err.body as { error?: { type?: string; detections?: FlaggedDetection[] } }) : undefined
+    const body = err instanceof ApiError
+      ? (err.body as { error?: { type?: string; detections?: FlaggedDetection[]; overridable?: boolean } })
+      : undefined
     if (err instanceof ApiError && body?.error?.type === 'pii_detected') {
-      throw new BlockedError(err.message, body.error.detections ?? [])
+      throw new BlockedError(err.message, body.error.detections ?? [], body.error.overridable ?? false)
     }
     throw err
   }
@@ -47,6 +55,7 @@ export async function streamChat({ conversationId, onConversationId, model, mess
   const warnings = JSON.parse(res.headers.get('X-PII-Warnings') ?? '[]') as FlaggedDetection[]
   const partial = JSON.parse(res.headers.get('X-Partially-Checked') ?? '[]') as PartialNotice[]
   const replaced = JSON.parse(res.headers.get('X-PII-Replaced') ?? '[]') as Replaced[]
+  const overridden = JSON.parse(res.headers.get('X-PII-Overridden') ?? '[]') as FlaggedDetection[]
   const savedAs = res.headers.get('X-Conversation-Id') ?? conversationId
   if (savedAs) onConversationId?.(savedAs)
 
@@ -72,5 +81,5 @@ export async function streamChat({ conversationId, onConversationId, model, mess
     }
   }
 
-  return { warnings, partial, replaced, conversationId: savedAs }
+  return { warnings, partial, replaced, overridden, conversationId: savedAs }
 }

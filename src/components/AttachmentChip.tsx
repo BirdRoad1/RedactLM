@@ -13,7 +13,8 @@ export function AttachmentChip({ attachment: a, onRemove }: { attachment: Attach
   const [anchor, setAnchor] = useState<DOMRect | null>(null)
   const worst = worstOf(a.issues) ?? 'ok'
   const status =
-    a.status === 'checking' ? 'Checking…'
+    a.status === 'unchecked' ? 'Not checked'
+    : a.status === 'checking' ? 'Checking…'
     : a.status === 'error' ? "Can't be sent"
     : !a.issues.length ? (a.partial ? 'Passed, partly checked' : 'No issues found')
     : worst === 'blocked' ? "Won't be sent"
