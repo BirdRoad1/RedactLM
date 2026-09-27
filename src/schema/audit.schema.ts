@@ -17,7 +17,7 @@ export const auditFilterSchema = z.object({
 
 export const auditListSchema = auditFilterSchema.extend({
   before: z.coerce.number().int().positive().optional(), // entries older than this id, for paging
-  limit: z.coerce.number().int().min(1).max(500).default(200),
+  limit: z.coerce.number().int().min(1).max(2000).default(200),
 });
 
 export type AuditFilter = z.infer<typeof auditFilterSchema>;
