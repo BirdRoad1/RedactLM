@@ -26,6 +26,9 @@ export const usersTable = pgTable("users", {
     // Soft delete: set = can't log in or use the app, but their chats and
     // audit history keep their name. The email is free for a new account.
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    // Login tokens issued before this are refused: set when the password
+    // changes, so it signs the user out everywhere
+    sessionsValidFrom: timestamp('sessions_valid_from', { withTimezone: true }),
 }, (t) => [
     uniqueIndex("users_email_active_idx").on(t.email).where(sql`${t.deletedAt} is null`),
 ]);

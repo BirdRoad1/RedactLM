@@ -14,11 +14,12 @@ export function createJWT(userId: number) {
     return { token, expiresAt };
 }
 
-export function verifyJWT(jwt: string): number {
+// The token's user, and when it was issued (seconds)
+export function verifyJWT(jwt: string) {
     const data = verify(jwt, env.JWT_SECRET, { algorithms: ['HS256'] });
     if (typeof data === 'string') throw new Error('Invalid JWT type');
 
-    const { userId } = jwtSchema.parse(data);
+    const { userId, iat } = jwtSchema.parse(data);
 
-    return userId;
+    return { userId, issuedAt: iat };
 }

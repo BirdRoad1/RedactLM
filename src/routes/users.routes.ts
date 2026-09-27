@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { createUser, deleteUser, listUsers, restoreUser, setUserRoles } from "../controllers/users.controller";
+import { createUser, deleteUser, listUsers, restoreUser, setUserPassword, setUserRoles } from "../controllers/users.controller";
 import { requireRole, type AuthEnv } from "../middleware/auth";
 
 export const usersRoutes = new Hono<AuthEnv>()
@@ -7,5 +7,6 @@ export const usersRoutes = new Hono<AuthEnv>()
   .get("/", listUsers)
   .post("/", createUser)
   .put("/:id/roles", setUserRoles)
+  .put("/:id/password", setUserPassword)
   .delete("/:id", deleteUser)
   .post("/:id/restore", restoreUser);

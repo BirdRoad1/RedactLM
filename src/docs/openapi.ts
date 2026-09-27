@@ -16,7 +16,7 @@ import {
   checkResponseSchema,
 } from "../schema/check.schema";
 import { updateLlmDetectorSchema } from "../schema/llm-detector.schema";
-import { createUserSchema, roleSchema, setRolesSchema } from "../schema/user.schema";
+import { createUserSchema, roleSchema, setPasswordSchema, setRolesSchema } from "../schema/user.schema";
 import { addKeywordsSchema } from "../schema/keywords.schema";
 import { createSsoProviderSchema, updateSsoProviderSchema } from "../schema/sso.schema";
 import type { UserRole } from "../db/schema";
@@ -259,7 +259,7 @@ export const openApiDoc = {
         tags: ["Audit"],
         summary: "Audit log entries, newest first",
         description:
-          "Newest first, `limit` at a time (200 by default, at most 2,000); pass the last id as `before` for the next page. Filters combine. `summary` describes each entry in plain language; entries never contain checked text, passwords or API keys. Events: message_blocked, message_warned, message_replaced, assistant_pii, partially_checked, attachment_refused, detector_unavailable, conversation_deleted, settings_changed, backend_created, backend_deleted, user_created, user_roles_changed, user_deleted, user_restored, rate_limited, keywords_added, keywords_deleted, audit_exported, block_overridden, sent_unchecked, conversation_reviewed, login_succeeded, login_failed.",
+          "Newest first, `limit` at a time (200 by default, at most 2,000); pass the last id as `before` for the next page. Filters combine. `summary` describes each entry in plain language; entries never contain checked text, passwords or API keys. Events: message_blocked, message_warned, message_replaced, assistant_pii, partially_checked, attachment_refused, detector_unavailable, conversation_deleted, settings_changed, backend_created, backend_deleted, user_created, user_roles_changed, user_deleted, user_restored, user_password_changed, rate_limited, keywords_added, keywords_deleted, audit_exported, block_overridden, sent_unchecked, conversation_reviewed, login_succeeded, login_failed.",
         security: bearer,
         parameters: [
           ...auditFilterParams,
@@ -441,6 +441,22 @@ export const openApiDoc = {
           200: { description: "The deleted user", content: json(user) },
           404: { description: "No such user" },
           409: error("Yourself, or the last admin"),
+        },
+      },
+    },
+    "/users/{id}/password": {
+      put: {
+        tags: ["Users"],
+        security: bearer,
+        summary: "Set a user's password",
+        description: "At least 8 characters. Signs them out everywhere: login tokens issued before the change stop working. Not for someone with roles you don't have. Changing your own password returns a fresh `session` so you stay signed in. Recorded in the audit log (never the password).",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+        requestBody: { required: true, content: json(setPasswordSchema, "input") },
+        responses: {
+          ...needs("manage_users"),
+          200: { description: "Changed", content: json(z.object({ user, session: z.object({ token: z.string(), expiresAt: z.string() }).optional() })) },
+          400: { description: "Too short or too long" },
+          404: { description: "No such user" },
         },
       },
     },

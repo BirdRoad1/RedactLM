@@ -83,8 +83,28 @@ export async function listUsers({ deleted = false } = {}) {
 // Undefined for users that don't exist or were deleted (e.g. after their
 // token was issued)
 export async function getRoles(userId: number) {
-  const [user] = await db.select({ roles: usersTable.roles }).from(usersTable).where(isUser(userId));
-  return user?.roles;
+  return (await getSessionUser(userId))?.roles;
+}
+
+// What checking a login token needs: the user's roles, and the time before
+// which their tokens no longer count (a password change)
+export async function getSessionUser(userId: number) {
+  const [user] = await db
+    .select({ roles: usersTable.roles, sessionsValidFrom: usersTable.sessionsValidFrom })
+    .from(usersTable)
+    .where(isUser(userId));
+  return user;
+}
+
+// Sets a new password and signs the user out everywhere: tokens issued
+// before now stop working. Undefined if there's no such (undeleted) user.
+export async function setPassword(userId: number, password: string) {
+  const [user] = await db
+    .update(usersTable)
+    .set({ passwordHash: await Bun.password.hash(password), sessionsValidFrom: new Date() })
+    .where(isUser(userId))
+    .returning(publicColumns);
+  return user;
 }
 
 // Locks every active admin, so two admins can't demote or delete each other

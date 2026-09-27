@@ -37,6 +37,7 @@ export type AuditEvents = {
   user_created: { email: string; roles?: UserRole[]; isAdmin?: boolean };
   user_roles_changed: { email: string; added: UserRole[]; removed: UserRole[] };
   user_deleted: { email: string };
+  user_password_changed: { email: string }; // never the password
   user_restored: { email: string };
   rate_limited: { limit: string; perMinute: number; ip?: string };
   login_succeeded: { email: string; ip?: string; via?: string }; // via: the SSO provider, if any
@@ -163,6 +164,8 @@ export function describeEvent(event: string, details: unknown): string {
       const roles = u.roles ?? (u.isAdmin ? ["admin"] : []);
       return `Created the user ${u.email}${roles.length ? ` (${listRoles(roles)})` : ""}.`;
     }
+    case "user_password_changed":
+      return `Changed the password of ${(d as AuditEvents["user_password_changed"]).email}, signing them out everywhere.`;
     case "user_deleted":
       return `Deleted the user ${(d as AuditEvents["user_deleted"]).email}.`;
     case "user_restored":

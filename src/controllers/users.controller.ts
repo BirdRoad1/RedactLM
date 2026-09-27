@@ -2,7 +2,8 @@ import type { Context } from "hono";
 import z from "zod";
 import { rolesBeyond } from "../auth/roles";
 import type { AuthEnv } from "../middleware/auth";
-import { createUserSchema, setRolesSchema } from "../schema/user.schema";
+import { createJWT } from "../auth/jwt";
+import { createUserSchema, setPasswordSchema, setRolesSchema } from "../schema/user.schema";
 import { audit } from "../services/audit.service";
 import * as usersService from "../services/users.service";
 
@@ -17,7 +18,7 @@ export async function listUsers(c: Context<AuthEnv>) {
 export async function createUser(c: Context<AuthEnv>) {
   const parsed = await createUserSchema.safeParseAsync(await c.req.json());
   if (parsed.error) {
-    return c.json({ error: "Invalid request" }, 400);
+    return c.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, 400);
   }
 
   const beyond = rolesBeyond(c.get("roles"), parsed.data.roles);
@@ -119,4 +120,28 @@ export async function restoreUser(c: Context<AuthEnv>) {
     }
     throw err;
   }
+}
+
+// Sets someone's password and signs them out everywhere. Same rule as roles:
+// not for someone with roles you don't have (it'd be a way into their
+// account). Changing your own also hands back a fresh session, so you stay in.
+export async function setUserPassword(c: Context<AuthEnv>) {
+  const id = userId.safeParse(c.req.param("id"));
+  if (id.error) return c.json({ error: "User not found" }, 404);
+  const parsed = await setPasswordSchema.safeParseAsync(await c.req.json());
+  if (parsed.error) return c.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, 400);
+
+  const roles = await usersService.getRoles(id.data);
+  if (!roles) return c.json({ error: "User not found" }, 404);
+  const beyond = rolesBeyond(c.get("roles"), roles);
+  if (beyond.length) {
+    return c.json({ error: `They have roles you don't (${beyond.join(", ")}), so you can't set their password` }, 403);
+  }
+
+  const user = await usersService.setPassword(id.data, parsed.data.password);
+  if (!user) return c.json({ error: "User not found" }, 404);
+  await audit("user_password_changed", { email: user.email });
+  if (id.data !== c.get("userId")) return c.json({ user });
+  const { token, expiresAt } = createJWT(id.data);
+  return c.json({ user, session: { token, expiresAt: expiresAt.toISOString() } });
 }
