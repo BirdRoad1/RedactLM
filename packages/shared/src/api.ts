@@ -133,9 +133,15 @@ export type ReviewConversation = {
     action: MessageAction
     model: string | null
     createdAt: string
+    // "intact": unchanged since it was saved. "unsealed": saved before
+    // messages were sealed, so it can't be checked. "broken": changed since,
+    // or a message before it was.
+    seal: MessageSeal
     detections: { reason: string; location: string | null; confidence: number; outcome: string }[]
   }[]
 }
+
+export type MessageSeal = "intact" | "unsealed" | "broken"
 
 // Stored messages have sensitive parts masked as "[REDACTED: Phone number]"
 export type Conversation = {

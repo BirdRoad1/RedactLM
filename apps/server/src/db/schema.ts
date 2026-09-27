@@ -59,6 +59,9 @@ export const messagesTable = pgTable("messages", {
     action: actionEnum().notNull().default("allowed"),
 
     created_at: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    // Keyed hash of this message, its detections and the previous message's
+    // hash (services/message-chain.ts). Null for messages saved before sealing.
+    hash: varchar({ length: 64 }),
 }, (t) => [
     uniqueIndex("messages_conv_position_idx").on(t.conversation_id, t.position),
 ]);

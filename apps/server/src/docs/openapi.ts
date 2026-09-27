@@ -499,7 +499,7 @@ export const openApiDoc = {
         tags: ["Review"],
         security: bearer,
         summary: "Read anyone's conversation",
-        description: "Every message as stored (sensitive parts masked), blocked attempts included, each with what was found in it. Each read is recorded in the audit log.",
+        description: "Every message as stored (sensitive parts masked), blocked attempts included, each with what was found in it and whether it still matches its seal. Each message is sealed with a keyed hash of itself, its detections and the message before it, so editing, removing or reordering stored messages shows up as `broken`. Each read is recorded in the audit log.",
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
         responses: {
           ...needs("review_chats"),
@@ -510,6 +510,7 @@ export const openApiDoc = {
               messages: z.array(z.object({
                 role: z.string(), content: z.string(), model: z.string().nullable(), createdAt: z.string(),
                 action: z.enum(["allowed", "warned", "redacted", "blocked", "overridden", "unchecked"]),
+                seal: z.enum(["intact", "unsealed", "broken"]).describe("Whether the stored message still matches its seal: `intact`; `unsealed` (saved before sealing began, so it can't be checked); `broken` (changed since, or a message before it was)"),
                 detections: z.array(z.object({ reason: z.string(), location: z.string().nullable(), confidence: z.number(), outcome: z.string() })),
               })),
             })),

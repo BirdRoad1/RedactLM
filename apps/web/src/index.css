@@ -259,6 +259,13 @@ kbd { font: inherit; font-size: 0.85em; border: 1px solid var(--border); border-
 .message.blocked .bubble { opacity: 0.6; border: 1px dashed var(--danger); }
 .message.overridden .bubble { box-shadow: 0 0 0 2px var(--danger); }
 .message p.small { margin: 0.2rem 0 0; }
+/* Review: whether stored messages still match their seals */
+.seal-banner { display: flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.7rem; border-radius: 6px; border: 1px solid var(--border); font-size: 0.9rem; }
+.seal-banner.intact { color: var(--ok); border-color: var(--ok); }
+.seal-banner.unsealed { color: var(--muted); }
+.seal-banner.broken { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); font-weight: 500; }
+.message .seal-broken { color: var(--danger); font-weight: 500; margin: 0.2rem 0 0; }
+.message.broken-seal .bubble { outline: 2px solid var(--danger); }
 .review-detections { margin: 0.2rem 0 0; padding-left: 1.1rem; }
 
 /* Composer: attach, input and send in one pill. The input starts one line

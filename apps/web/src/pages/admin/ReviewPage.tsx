@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api } from '../../api/client'
 import type { MessageAction, ReviewConversation, ReviewSummary } from '../../api/types'
+import { ShieldIcon } from '../../components/icons'
 import { Markdown } from '../../components/Markdown'
 import { MessageContent } from '../../components/MessageContent'
 
@@ -77,6 +78,33 @@ function ConversationTable() {
   )
 }
 
+// Whether the stored messages still match their seals (a hash chain the
+// server keeps), in one line above the transcript
+function SealBanner({ messages }: { messages: ReviewConversation['messages'] }) {
+  if (!messages.length) return null
+  const broken = messages.filter((m) => m.seal === 'broken').length
+  const firstSealed = messages.find((m) => m.seal !== 'unsealed')
+  if (broken) {
+    return (
+      <p className="seal-banner broken">
+        {broken === 1 ? '1 message doesn\'t' : `${broken} messages don't`} match what was saved: changed, removed or
+        reordered since. Marked below.
+      </p>
+    )
+  }
+  if (!firstSealed) {
+    return <p className="seal-banner unsealed">Saved before messages were sealed, so it can't be checked for changes.</p>
+  }
+  return (
+    <p className="seal-banner intact">
+      <ShieldIcon size={16} />
+      {firstSealed === messages[0]
+        ? 'Unchanged since it was saved: every message matches its seal.'
+        : `Unchanged since ${new Date(firstSealed.createdAt).toLocaleString()}; earlier messages were saved before sealing.`}
+    </p>
+  )
+}
+
 function Transcript({ id }: { id: string }) {
   const [convo, setConvo] = useState<ReviewConversation | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -95,10 +123,12 @@ function Transcript({ id }: { id: string }) {
           <p className="muted">
             {convo.user}{convo.client && ` · ${convo.client}`} · last updated {new Date(convo.updatedAt).toLocaleString()}
           </p>
+          <SealBanner messages={convo.messages} />
           <div className="messages review">
             {convo.messages.map((m, i) => (
-              <div key={i} className={`message ${m.role} ${m.action}`}>
+              <div key={i} className={`message ${m.role} ${m.action}${m.seal === 'broken' ? ' broken-seal' : ''}`}>
                 <div className="bubble">{m.role === 'assistant' ? <Markdown text={m.content} /> : <MessageContent text={m.content} />}</div>
+                {m.seal === 'broken' && <p className="small seal-broken">Changed since it was saved, or a message before it was</p>}
                 <p className="small muted">
                   {m.role === 'user' && <span className={`event-tag ${m.action}`}>{ACTIONS[m.action]}</span>}{' '}
                   {new Date(m.createdAt).toLocaleString()}{m.model && ` · ${m.model}`}
