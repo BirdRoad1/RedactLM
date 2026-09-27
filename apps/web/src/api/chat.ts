@@ -26,11 +26,12 @@ type ChatOptions = {
   override?: boolean // send even if blocked (needs the override role)
   signal?: AbortSignal
   onDelta: (text: string) => void // called with each streamed piece of the reply
+  onReplaced?: (replaced: Replaced[]) => void // before the reply streams: what was swapped for placeholders
 }
 
 // Streams a chat completion. Resolves with any warnings the proxy attached;
 // throws BlockedError when blocked, ApiError for other failures.
-export async function streamChat({ conversationId, onConversationId, model, messages, override, signal, onDelta }: ChatOptions) {
+export async function streamChat({ conversationId, onConversationId, model, messages, override, signal, onDelta, onReplaced }: ChatOptions) {
   let res: Response
   try {
     res = await apiFetch('/v1/chat/completions', {
@@ -58,6 +59,7 @@ export async function streamChat({ conversationId, onConversationId, model, mess
   const overridden = JSON.parse(res.headers.get('X-PII-Overridden') ?? '[]') as FlaggedDetection[]
   const savedAs = res.headers.get('X-Conversation-Id') ?? conversationId
   if (savedAs) onConversationId?.(savedAs)
+  if (replaced.length) onReplaced?.(replaced)
 
   // Server-Sent Events: "data: {chunk}" lines, ending with "data: [DONE]"
   const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader()

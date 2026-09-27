@@ -204,7 +204,7 @@ export async function createCompletion(c: Context<AuthEnv>) {
   // may override.
   const keptBefore = continuing && hasRole(roles, "override") ? await getOverriddenPlaceholders(convo) : new Set<string>();
   const planned = scans.flatMap((scan, messageIndex) =>
-    (scan?.replacements ?? []).map((r) => ({ messageIndex, ...r, placeholder: placeholderFor(r.value, convo) })),
+    (scan?.replacements ?? []).map((r) => ({ messageIndex, ...r, placeholder: placeholderFor(r.value, convo, r.checker) })),
   );
   const keptValues = new Set(
     planned

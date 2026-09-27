@@ -32,7 +32,7 @@ export function IssuePopup({ group, anchor, note }: { group: IssueGroup; anchor:
             <p className="replaced-note">
               {issue.placeholder
                 ? <>Sent as <code>{issue.placeholder}</code>, so the AI never saw it.</>
-                : <>It will be swapped for a placeholder such as <code>redacted-3f9a1c0b7e2d</code> before sending, so the AI never sees it.</>}
+                : <>It will be swapped for a placeholder such as <code>SSN-3f9a1c0b7e2d</code> before sending, so the AI never sees it.</>}
             </p>
           )}
           {!issue.placeholder && <p className="muted small">{likelihood(issue.confidence)} to be sensitive.</p>}

@@ -18,8 +18,14 @@ describe("replace mode outcomes", () => {
 });
 
 describe("placeholderFor", () => {
-  test("redacted- plus 12 hex characters", () => {
-    expect(placeholderFor("123-12-1234", "c1")).toMatch(/^redacted-[0-9a-f]{12}$/);
+  test("rules and keywords label it with what it is; the local AI model's finds are redacted-", () => {
+    expect(placeholderFor("123-12-1234", "c1", "ssn")).toMatch(/^SSN-[0-9a-f]{12}$/);
+    expect(placeholderFor("1234 5678 9012 3456", "c1", "credit-card")).toMatch(/^CREDIT_CARD-[0-9a-f]{12}$/);
+    expect(placeholderFor("Project Falcon", "c1", "keyword")).toMatch(/^KEYWORD-[0-9a-f]{12}$/);
+    expect(placeholderFor("Jane Smith", "c1", "local-llm")).toMatch(/^redacted-[0-9a-f]{12}$/);
+    expect(placeholderFor("Jane Smith", "c1")).toMatch(/^redacted-[0-9a-f]{12}$/);
+    // the label isn't part of the hash
+    expect(placeholderFor("123-12-1234", "c1", "ssn").slice(-12)).toBe(placeholderFor("123-12-1234", "c1").slice(-12));
   });
 
   test("same value, same conversation: same placeholder; otherwise different", () => {
@@ -52,6 +58,11 @@ describe("replaceAll", () => {
 
   test("regex characters in values are literal", () => {
     expect(replaceAll("key a+b(c)*", new Map([["a+b(c)*", "redacted-dddddddddddd"]]))).toBe("key redacted-dddddddddddd");
+  });
+
+  test("one pass: a placeholder put in is never matched again", () => {
+    const map = new Map([["123-12-1234", "SSN-aaaaaaaaaaaa"], ["SSN", "KEYWORD-bbbbbbbbbbbb"]]);
+    expect(replaceAll("SSN 123-12-1234", map)).toBe("KEYWORD-bbbbbbbbbbbb SSN-aaaaaaaaaaaa");
   });
 });
 

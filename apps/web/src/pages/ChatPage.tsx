@@ -17,6 +17,8 @@ import { Markdown } from '../components/Markdown'
 import { MessageContent } from '../components/MessageContent'
 import { ModelPicker } from '../components/ModelPicker'
 import { PaperclipIcon } from '../components/icons'
+import { swapsFrom, type Swaps } from '../components/placeholders'
+import { AiText } from '../components/SwappedText'
 import { useLiveCheck } from '../hooks/useLiveCheck'
 
 // `stored`: loaded from history, so sensitive parts are already masked.
@@ -104,6 +106,10 @@ export function ChatPage() {
   const [models, setModels] = useState<Model[]>([])
   const [model, setModel] = useState('')
   const [entries, setEntries] = useState<Entry[]>([])
+  // what each placeholder the AI got stands for, in this conversation; only
+  // in memory, since the values are never stored anywhere
+  const [swaps, setSwaps] = useState<Swaps>(new Map())
+  const [aiView, setAiView] = useState(false) // show what the AI saw instead
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const fileInput = useRef<HTMLInputElement>(null)
@@ -137,10 +143,12 @@ export function ChatPage() {
     setError(null)
     if (!id) {
       setEntries([])
+      setSwaps(new Map())
       return
     }
     if (id === startedHere.current) return
     abort.current?.abort()
+    setSwaps(new Map())
 
     let cancelled = false
     getConversation(id)
@@ -230,6 +238,7 @@ export function ChatPage() {
         override,
         signal: abort.current.signal,
         onDelta: appendToReply,
+        onReplaced: (replaced) => setSwaps((current) => new Map([...current, ...swapsFrom(replaced, history)])),
       })
       if (overridden.length) {
         setEntries((current) =>
@@ -324,6 +333,12 @@ export function ChatPage() {
       <div className="chat">
         <div className="chat-toolbar">
           <ModelPicker models={models} value={model} onChange={setModel} />
+          {swaps.size > 0 && (
+            <label className="ai-view-toggle" title="Show the placeholders the AI was sent instead of your sensitive values">
+              <input type="checkbox" role="switch" checked={aiView} onChange={(e) => setAiView(e.target.checked)} />
+              What the AI saw
+            </label>
+          )}
         </div>
 
         <div className="messages">
@@ -349,9 +364,11 @@ export function ChatPage() {
                   </span>
                 )}
                 {entry.role === 'assistant' ? (
-                  <Markdown text={entry.content} />
+                  <Markdown text={entry.content} swaps={swaps} aiView={aiView} />
                 ) : entry.stored ? (
                   <MessageContent text={entry.content} />
+                ) : aiView ? (
+                  <AiText text={entry.content} swaps={swaps} />
                 ) : entry.warnings || entry.replaced ? (
                   <HighlightedText text={entry.content} issues={[...(entry.warnings ?? []), ...(entry.replaced ?? [])]} />
                 ) : (
@@ -372,7 +389,7 @@ export function ChatPage() {
                 <p className="replaced-note">
                   Replaced before sending, so the AI saw placeholders instead:{' '}
                   {[...new Set((entry.replaced ?? []).map((r) => r.title)), ...(entry.replacedInFiles ?? [])].join(', ')}.
-                  {entry.replaced && ' Hover the highlights to see what was sent.'}
+                  {entry.replaced && ' Hover the highlights, or switch on “What the AI saw”, to see what was sent.'}
                 </p>
               )}
               {entry.partial && (

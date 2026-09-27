@@ -41,7 +41,7 @@ export function PolicyPage() {
       <h1>Detection policy</h1>
       <p className="muted">
         Every detection has a confidence from 0 to 1. At or above <strong>block</strong> the message isn't sent, or, if you
-        choose to replace, what was found is swapped for a placeholder like <code>redacted-3f9a1c0b7e2d</code> and the
+        choose to replace, what was found is swapped for a placeholder like <code>SSN-3f9a1c0b7e2d</code> (or <code>redacted-3f9a1c0b7e2d</code> for what the local AI model finds) and the
         message is sent. Replacing works in message text and plain-text files; PDFs and images are still stopped. At or
         above <strong>warn</strong> it's sent with a warning. Detected text is masked in storage either way.
       </p>

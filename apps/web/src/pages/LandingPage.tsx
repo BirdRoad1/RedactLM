@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { PLACEHOLDER } from '@llm-thingy/shared'
 import { Link } from 'react-router'
 import { useAuth } from '../auth/AuthContext'
 import { ArchitectureDiagram } from '../components/ArchitectureDiagram'
@@ -20,9 +21,9 @@ const MESSAGE =
 // What the example "finds", and the placeholder the AI gets instead
 const FINDINGS = [
   { text: 'Jane Cooper', label: "Person's name", by: 'Local AI', placeholder: 'redacted-8c21f04a9b3e' },
-  { text: '529-43-1187', label: 'Social Security number', by: 'Rule', placeholder: 'redacted-3f9a1c0b7e2d' },
-  { text: 'Project Falcon', label: 'Private company term', by: 'Keyword', placeholder: 'redacted-a17be2c09d44' },
-  { text: 'jane.cooper@acme.com', label: 'Email address', by: 'Rule', placeholder: 'redacted-5d0e93b17c62' },
+  { text: '529-43-1187', label: 'Social Security number', by: 'Rule', placeholder: 'SSN-3f9a1c0b7e2d' },
+  { text: 'Project Falcon', label: 'Private company term', by: 'Keyword', placeholder: 'KEYWORD-a17be2c09d44' },
+  { text: 'jane.cooper@acme.com', label: 'Email address', by: 'Rule', placeholder: 'EMAIL-5d0e93b17c62' },
 ].map((f) => ({ ...f, start: MESSAGE.indexOf(f.text), end: MESSAGE.indexOf(f.text) + f.text.length }))
 
 const SENT = FINDINGS.reduce((text, f) => text.replace(f.text, f.placeholder), MESSAGE)
@@ -104,8 +105,9 @@ function Demo() {
           <span className="demo-status sent">Placeholders only</span>
         </div>
         <p className="demo-text">
-          {SENT.split(/(redacted-[0-9a-f]{12})/).map((piece, i) =>
-            piece.startsWith('redacted-') ? <code key={i}>{piece}</code> : piece,
+          {/* split on a capturing group: the placeholders land at odd indexes */}
+          {SENT.split(new RegExp(`(${PLACEHOLDER.source})`)).map((piece, i) =>
+            i % 2 ? <code key={i}>{piece}</code> : piece,
           )}
         </p>
       </div>

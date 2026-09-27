@@ -695,7 +695,7 @@ export const openApiDoc = {
         tags: ["Settings"],
         summary: "Get the warn/block thresholds",
         description:
-          "`mode` says what reaching `blockAt` does: `block` stops the message; `replace` swaps what was found for a placeholder like `redacted-3f9a1c0b7e2d` and sends it, wherever that can be done cleanly (message text and plain-text files; PDFs and images still block). The same value gets the same placeholder everywhere within a conversation. Detections carry a confidence from 0 to 1. At or above `blockAt` the request is rejected; at or above `warnAt` it goes through with a warning; below both it's only recorded. `null` means never. `checkers` lists every checker with its effective thresholds; `overridden` ones don't follow the global values.",
+          "`mode` says what reaching `blockAt` does: `block` stops the message; `replace` swaps what was found for a placeholder and sends it: `SSN-3f9a1c0b7e2d`, labelled with the rule or `KEYWORD` that found it, or `redacted-3f9a1c0b7e2d` for what the local LLM detector finds, wherever that can be done cleanly (message text and plain-text files; PDFs and images still block). The same value gets the same placeholder everywhere within a conversation. Detections carry a confidence from 0 to 1. At or above `blockAt` the request is rejected; at or above `warnAt` it goes through with a warning; below both it's only recorded. `null` means never. `checkers` lists every checker with its effective thresholds; `overridden` ones don't follow the global values.",
         security: bearer,
         responses: { ...needs("manage_settings"), 200: { description: "Policy", content: json(detectionPolicy) } },
       },

@@ -304,6 +304,19 @@ kbd { font: inherit; font-size: 0.85em; border: 1px solid var(--border); border-
 .message.user .bubble mark.warned { background: #ffe6a1; box-shadow: 0 0 0 2px #ffe6a1; }
 .message.user .bubble mark.blocked { background: #ffd4d0; box-shadow: 0 0 0 2px #ffd4d0; }
 
+/* Values put back into AI replies, and placeholders as the AI saw them */
+mark.restored { background: var(--replace-mark); color: inherit; border-radius: 3px; padding: 0 2px; border-bottom: 1px dotted var(--replace); cursor: help; }
+mark.placeholder { background: none; color: var(--replace); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88em; border: 1px dashed var(--replace); border-radius: 3px; padding: 0 3px; cursor: help; }
+.message.user .bubble mark.placeholder { background: #e9dfff; color: #4a2590; border-color: #4a2590; border-bottom-style: dashed; }
+
+/* The "What the AI saw" switch in the chat toolbar */
+.ai-view-toggle { display: inline-flex; align-items: center; gap: 0.45rem; margin-left: auto; font-size: 0.85rem; color: var(--replace); cursor: pointer; user-select: none; }
+.ai-view-toggle input { appearance: none; width: 2rem; height: 1.1rem; border-radius: 999px; background: var(--border); position: relative; cursor: pointer; margin: 0; padding: 0; border: none; transition: background 0.15s; }
+.ai-view-toggle input::after { content: ''; position: absolute; top: 2px; left: 2px; width: calc(1.1rem - 4px); height: calc(1.1rem - 4px); border-radius: 50%; background: #fff; transition: transform 0.15s; box-shadow: 0 1px 2px rgb(0 0 0 / 0.3); }
+.ai-view-toggle input:checked { background: var(--replace); }
+.ai-view-toggle input:checked::after { transform: translateX(0.9rem); }
+.ai-view-toggle input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 /* Keywords */
 .keyword-form { display: flex; flex-direction: column; gap: 0.6rem; }
 .keyword-form textarea { resize: vertical; }
