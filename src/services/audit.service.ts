@@ -19,6 +19,9 @@ export type AuditEvents = {
   message_replaced: { messageIndex: number; findings: Finding[] };
   block_overridden: { messageIndex: number; findings: Finding[] };
   sent_unchecked: { messageIndex: number; because: "admin" | "no_check" };
+  // personal data in the model's own text, logged only: `request` is an
+  // assistant message a client sent along, `reply` is what the model answered
+  assistant_pii: { where: "request" | "reply"; messageIndex?: number; findings: Finding[] };
   partially_checked: PartialCheck & { messageIndex: number };
   attachment_refused: { reason: string };
   detector_unavailable: { failMode: "block" | "allow"; reason: string };
@@ -96,6 +99,12 @@ export function describeEvent(event: string, details: unknown): string {
       return (d as AuditEvents["sent_unchecked"]).because === "admin"
         ? "Message sent without checks (admins' messages aren't checked)."
         : "Message sent without checks (this user's messages aren't checked).";
+    case "assistant_pii": {
+      const p = d as AuditEvents["assistant_pii"];
+      return p.where === "reply"
+        ? `The AI's reply contained ${listFindings(p.findings)}. Logged only; the reply wasn't changed.`
+        : `An assistant message sent with the request contained ${listFindings(p.findings)}. Logged only; it was sent as it was.`;
+    }
     case "partially_checked": {
       const p = d as AuditEvents["partially_checked"];
       const what = p.source ? `"${p.source.filename}"` : "a message";

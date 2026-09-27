@@ -15,6 +15,10 @@ describe("describeEvent: plain-language summaries", () => {
     ["settings_changed", { setting: "the detection policy defaults", changes: { mode: "replace", blockAt: null } },
       'Changed the detection policy defaults: mode → "replace", blockAt → none.'],
     ["login_failed", { email: "a@b.com", ip: "10.0.0.5" }, "Failed login for a@b.com from 10.0.0.5."],
+    ["assistant_pii", { where: "reply", findings: [{ title: "Email address", checker: "email" }] },
+      "The AI's reply contained Email address. Logged only; the reply wasn't changed."],
+    ["assistant_pii", { where: "request", messageIndex: 1, findings: [{ title: "Social Security number", checker: "ssn" }] },
+      "An assistant message sent with the request contained Social Security number. Logged only; it was sent as it was."],
     ["attachment_refused", { reason: '"x.docx" can\'t be checked because it\'s a Word document.' },
       'Attachment refused: "x.docx" can\'t be checked because it\'s a Word document.'],
   ])("%s", (event, details, expected) => {

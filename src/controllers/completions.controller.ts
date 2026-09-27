@@ -4,7 +4,7 @@ import {
   LlmDetectorUnavailableError,
   runLlmChecks,
 } from "../checkers/llm/llm-checker";
-import type { Outcome } from "../checkers/policy";
+import type { Outcome, Policy } from "../checkers/policy";
 import type { AuthEnv } from "../middleware/auth";
 import { completionsRequest } from "../schema/completions-request.schema";
 import type {
@@ -88,6 +88,22 @@ function flagged(scans: (Scan | undefined)[], outcome: Outcome): FlaggedDetectio
         end: d.end,
       })),
   );
+}
+
+// Text written by the model: assistant messages sent along with a request
+// (history an API client keeps) and the model's replies. The rules and
+// keywords check it, but it's only logged: never blocked or changed, so
+// anything found counts as a warning at most. It's masked for storage like
+// everything else.
+function checkModelText(text: string, policy: Policy) {
+  const scored = scanStatic(text, policy).scored.map((s) => ({
+    ...s,
+    outcome: s.outcome === "ignored" ? ("ignored" as const) : ("warned" as const),
+  }));
+  const findings: Finding[] = scored
+    .filter((s) => s.outcome === "warned")
+    .map(({ detection: d }) => ({ title: d.title, checker: d.checker }));
+  return { scored, findings };
 }
 
 export async function createCompletion(c: Context<AuthEnv>) {
@@ -211,6 +227,12 @@ export async function createCompletion(c: Context<AuthEnv>) {
   for (const [i, message] of messages.entries()) {
     if (i < firstToSave) continue;
     const outcome = scans[i]?.outcome ?? "ignored";
+    // assistant text is checked and logged only; system and tool messages
+    // aren't checked, but are masked for storage all the same
+    const modelText = message.role === "assistant" ? checkModelText(message.content, policy) : undefined;
+    const storageOnly = !scans[i] && !modelText
+      ? scanStatic(message.content, policy).scored.map((s) => ({ ...s, outcome: "ignored" as const }))
+      : undefined;
     await saveMessage(
       {
         conversation_id: convo,
@@ -223,11 +245,12 @@ export async function createCompletion(c: Context<AuthEnv>) {
         model: json.model,
       },
       // unchecked messages are still masked for storage, by the local rules
-      unchecked
-        ? scanStatic(message.content, policy).scored.map((s) => ({ ...s, outcome: "ignored" as const }))
-        : scans[i]?.scored,
+      modelText?.scored ?? scans[i]?.scored ?? storageOnly,
       message.filenames,
     );
+    if (modelText?.findings.length) {
+      await audit("assistant_pii", { where: "request", messageIndex: i, findings: modelText.findings }, { conversationId: convo });
+    }
     if (unchecked && message.role === "user") {
       await audit("sent_unchecked", { messageIndex: i, because: roles.includes("admin") ? "admin" : "no_check" }, { conversationId: convo });
     }
@@ -316,21 +339,30 @@ export async function createCompletion(c: Context<AuthEnv>) {
   };
   for (const param of backend.stripParams) delete body[param];
 
-  // Replies echo what they were sent, so they're masked before storage too
-  const saveReply = (reply: CollectedReply) =>
-    saveMessage(
-      {
-        conversation_id: convo,
-        position,
-        role: "assistant",
-        action: "allowed",
-        content: reply.content,
-        tool_calls: reply.toolCalls.length ? reply.toolCalls : null,
-        request_id: reply.id,
-        model: `${backend.slug}/${reply.model ?? upstreamModel}`,
-      },
-      scanStatic(reply.content, policy).scored,
-    ).catch((err) => console.error("Failed to save assistant reply:", err));
+  // Replies are checked like any model text: masked for storage, and what
+  // the rules find is logged, never changed. Streamed replies finish after
+  // this handler has returned, so the user is passed explicitly.
+  const saveReply = async (reply: CollectedReply) => {
+    const { scored, findings } = checkModelText(reply.content, policy);
+    try {
+      await saveMessage(
+        {
+          conversation_id: convo,
+          position,
+          role: "assistant",
+          action: "allowed",
+          content: reply.content,
+          tool_calls: reply.toolCalls.length ? reply.toolCalls : null,
+          request_id: reply.id,
+          model: `${backend.slug}/${reply.model ?? upstreamModel}`,
+        },
+        scored,
+      );
+      if (findings.length) await audit("assistant_pii", { where: "reply", findings }, { userId, conversationId: convo });
+    } catch (err) {
+      console.error("Failed to save assistant reply:", err);
+    }
+  };
 
   const init = { body, signal: c.req.raw.signal };
 

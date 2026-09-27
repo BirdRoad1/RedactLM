@@ -256,7 +256,7 @@ export const openApiDoc = {
         tags: ["Audit"],
         summary: "Audit log entries, newest first",
         description:
-          "Newest first, `limit` at a time (200 by default, at most 500); pass the last id as `before` for the next page. Filters combine. `summary` describes each entry in plain language; entries never contain checked text, passwords or API keys. Events: message_blocked, message_warned, message_replaced, partially_checked, attachment_refused, detector_unavailable, conversation_deleted, settings_changed, backend_created, backend_deleted, user_created, user_roles_changed, user_deleted, user_restored, keywords_added, keywords_deleted, audit_exported, block_overridden, sent_unchecked, conversation_reviewed, login_succeeded, login_failed.",
+          "Newest first, `limit` at a time (200 by default, at most 500); pass the last id as `before` for the next page. Filters combine. `summary` describes each entry in plain language; entries never contain checked text, passwords or API keys. Events: message_blocked, message_warned, message_replaced, assistant_pii, partially_checked, attachment_refused, detector_unavailable, conversation_deleted, settings_changed, backend_created, backend_deleted, user_created, user_roles_changed, user_deleted, user_restored, keywords_added, keywords_deleted, audit_exported, block_overridden, sent_unchecked, conversation_reviewed, login_succeeded, login_failed.",
         security: bearer,
         parameters: [
           ...auditFilterParams,
